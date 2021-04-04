@@ -11,12 +11,13 @@ STORAGE_ID = 1
 def recovery(node_ip, node_id):
 	#Will call monitor to state about the down node
 	soc = socket.socket()
-	soc.settimeout(3)
+	soc.settimeout(5)
+	print ("Socket successfully created for Recovery: Primary")
 
 	monitor_1 = monitor_ip["primary"]
 	
 	try :
-		soc.connect(monitor_1["ip"], monitor_1["port"])	
+		soc.connect((monitor_1["ip"], monitor_1["port"]))	
 		soc.timeout(None)
 
 		print(f"Connecting Primary monitor...")
@@ -32,20 +33,22 @@ def recovery(node_ip, node_id):
 				pass
 
 		except soc.timeout: # fail after 1 second of no activity
-			print("Didn't receive data! [Timeout] Primary Monitor is Down")
+			print("Didn't receive data! [Timeout] Primary Monitor is failed in between")
 
 	except : 
-		print("Didn't receive data! [Timeout] Primary Monitor is Down")
+		print("Didn't Connect! [Timeout] Primary Monitor is Down")
 
 	soc.close()
 
 	soc = socket.socket()
-	soc.settimeout(3)
+	soc.settimeout(5)
+	print ("Socket successfully created for Recovery: Backup")
+	
 
 	monitor_2 = monitor_ip["backup"]
 
 	try : 
-		soc.connect(monitor_2["ip"], monitor_2["port"])	
+		soc.connect((monitor_2["ip"], monitor_2["port"]))	
 		soc.settimeout(None)			
 		print(f"Connecting Backup monitor...")
 	
@@ -60,10 +63,11 @@ def recovery(node_ip, node_id):
 				pass
 
 		except soc.timeout: # fail after 1 second of no activity
-			print("Didn't receive data! [Timeout] Primary Monitor is Down")
+			print("Didn't receive data! [Timeout] Backup Monitor failed in between")
 
 	except:
-		print("MAY GOD HELP US!! WE ARE DOOMED")
+		print("MAY GOD HELP US!! WE ARE DOOMED\n\n")
+
 	
 	soc.close()
 
@@ -77,37 +81,37 @@ def gossip():
 
 		i=0
 		for i in range(4):
-			node_ip =  storage_ip[i+1]["ip"]
-			port = storage_ip[i+1]["port"]
+			if i+1 != STORAGE_ID:
+				node_ip =  storage_ip[i+1]["ip"]
+				port = storage_ip[i+1]["port"]
 
-			soc.settimeout(3)
-			soc = socket.socket()
-			soc.settimeout(None)
-			print ("Socket successfully created for Gossip")
-		
-			try :
-				soc.connect((node_ip, port))
-				soc.timeout(None)
-
-				print(f"Connecting {node_ip} storage node number {i+1}")
-				
-				msg = {"type": "ALIVE"}
-				_send_msg(soc, msg)
-
-				try:
-					rec = _recv_msg(c, 1024)
-					if rec["type"] != "ALIVE": 
-						recovery(node_ip, i+1)
-
-				except socket.timeout: # fail after 1 second of no activity
-					print("Didn't receive data! [Timeout]")
-					recovery(node_ip, i+1)
-				
-			except :	
-				print("Didn't receive data! [Timeout]")
-				recovery(node_ip, i+1)
+				soc = socket.socket()
+				soc.settimeout(3)
+				print ("Socket successfully created for Gossip")
 			
-			soc.close()	
+				try :
+					soc.connect((node_ip, port))
+					soc.settimeout(None)
+
+					print(f"Connecting {node_ip} storage node number {i+1}")
+					
+					msg = {"type": "ALIVE"}
+					_send_msg(soc, msg)
+
+					try:
+						rec = _recv_msg(c, 1024)
+						if rec["type"] != "ALIVE": 
+							recovery(node_ip, i+1)
+
+					except soc.timeout: # fail after 1 second of no activity
+						print(f"Didn't receive data to Storage {i+1} ip {node_ip}! [Timeout] ")
+						recovery(node_ip, i+1)
+					
+				except :	
+					print(f"Didn't Connect to Storage {i+1} ip {node_ip}! [Timeout]")
+					recovery(node_ip, i+1)
+			
+				soc.close()	
 
 
 
@@ -119,27 +123,28 @@ def heartbeat_protocol():
 	print ("Socket successfully created for Heartbeat")
 	port =  storage_ip[STORAGE_ID]["port"] 
 	s.bind(('', port))         
-	print ("socket binded to %s" %(port)) 
+	print ("Socket binded to %s" %(port)) 
 	  
 	# put the socket into listening mode 
 	s.listen(5)     
-	print ("socket is listening") 
+	print ("Socket is listening") 
 
 	while True:
 		# Establish connection with client. 
 		c, addr = s.accept()     
 		print ('Got connection from', addr )
-		  
-		# send a thank you message to the client. 
-		msg = _recv_msg(c, 1024)
-		print(msg)
 
-		if msg["type"] == "ALIVE":
-			res = {"type": "ACK"}
-			_send_msg(c, res)
+		try:
+			msg = _recv_msg(c, 1024)
+			if msg["type"] != "ALIVE": 
+				res = {"type": "ACK"}
+				_send_msg(c, res)
+
+		except c.timeout: # fail after 1 second of no activity
+			print(f"Didn't receive data from ip {addr}! [Timeout] ")
+			recovery(addr, None)
 
 		c.close()
-
 
 
 if __name__ == "__main__":

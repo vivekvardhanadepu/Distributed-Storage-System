@@ -37,19 +37,23 @@ def heartbeat_protocol(soc):
 	# Establish connection with client. 
 	c, addr = s.accept()     
 	print ('Got connection from', addr )
-	  
+	
 	# send a thank you message to the client. 
-	msg = _recv_msg(c, 1024)
-	print(msg)
+	try:
+		msg = _recv_msg(c, 1024)
+		print(msg)
 
-	if msg["type"] == "ALIVE":
-		res = {"type": "ACK"}
-		_send_msg(c, res)
+		if msg["type"] == "ALIVE":
+			res = {"type": "ACK"}
+			_send_msg(c, res)
 
-	elif msg["type"] == "FAIL":
-		res = {"type": "ACK"}
-		_send_msg(c, res)
-		gossip(c, msg)
+		elif msg["type"] == "FAIL":
+			res = {"type": "ACK"}
+			_send_msg(c, res)
+			gossip(c, msg)
+
+	except c.timeout: # fail after 1 second of no activity
+		print(f"Didn't receive data! [Timeout] {addr}")
 
 	c.close()
 
@@ -60,8 +64,7 @@ if __name__ == "__main__":
 	print ("Socket successfully created")
 	  
 	# reserve a port on your computer in our 
-	# case it is 12345 but it can be anything 
-	port =  monitor_ip["backup"]["port"]       
+	port =  monitor_ip["primary"]["port"]       
 	  
 	# Next bind to the port 
 	# we have not typed any ip in the ip field 
@@ -69,7 +72,7 @@ if __name__ == "__main__":
 	# this makes the server listen to requests 
 	# coming from other computers on the network 
 	s.bind(('', port))         
-	print ("socket binded to %s" %(port)) 
+	print ("Monitor socket binded to %s" %(port)) 
 	  
 	# put the socket into listening mode 
 	s.listen(5)     
