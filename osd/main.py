@@ -6,17 +6,18 @@
 
 import socket
 import pickle
+import sys
+sys.path.insert('../utils/')
 from transfer import _send_msg, _recv_msg
-from object_pg import DataObject, PlacementGroup
 
-#HEADERSIZE = 10
+HEADERSIZE = 10
 
 s = socket.socket()
 print ("Socket successfully created")
 
 # reserve a port on your computer in our
 # case it is 12345 but it can be anything
-port = 12345
+port = 12346
 
 # Next bind to the port
 # we have not typed any ip in the ip field
@@ -43,12 +44,43 @@ while True:
 
     print(msg)
 
-    res = {"osd_ip":[["127.0.0.1", 12346], ["127.0.0.1", 8090]]}
+    if(msg["type"] == "WRITE"):
+    	pg = msg["PG"]
+    	file = open("./data/"+pg.pg_id, 'wb')
 
-    _send_msg(c, res)
+    	pg_b = pickle.dumps(pg)
+    	file.write(pg_b)
+
+    	# pickle.dump(pg, file)
+    	file.close()
+
+    	_send_msg(c, [pg.pg_id, "SUCCESS"])
+
+    elif msg["type"] == "READ":
+    	pg_id = msg["PG_id"]
+    	file = open("./data/"+pg_id, 'rb')
+
+    	pg_b = file.read()
+    	pg = pickle.loads(pg_b)
+
+    	file.close()
+    	# print(pg)
+    	msg = {"pg_id": pg.pg_id, "res":"SUCCESS", "PG":pg}
+
+    	_send_msg(c, msg)
 
     c.close()
+
+    print("RECV")
+    print(msg)
 
 s.close()
 # Close the connection with the client
 #c.close()
+
+def main():
+	test_adult_data()
+
+
+if __name__ == '__main__':
+	main()
