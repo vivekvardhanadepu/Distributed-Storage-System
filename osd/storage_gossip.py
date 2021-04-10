@@ -24,16 +24,13 @@ def recovery(node_ip, node_id):
 		
 		res = {"type": "FAIL", "ip" : node_ip, "id" : node_id}
 		_send_msg(soc, res)
-
-		try:
-			msg = _recv_msg(c, 1024)
-			if msg["type"] == "ACK": 
-				return
-			else:
-				pass
-
-		except soc.timeout: # fail after 1 second of no activity
-			print("Didn't receive data! [Timeout] Primary Monitor is failed in between")
+		time.sleep(3)
+		
+		msg = _recv_msg(c, MSG_SIZE)
+		if msg == None:
+			pass
+		elif msg["type"] == "ACK": 
+			return
 
 	except : 
 		print("Didn't Connect! [Timeout] Primary Monitor is Down")
@@ -54,21 +51,17 @@ def recovery(node_ip, node_id):
 	
 		res = {"type": "FAIL", "ip" : node_ip, "id" : node_id}
 		_send_msg(soc, res)
+		time.sleep(3)
 
-		try:
-			msg = _recv_msg(c, 1024)
-			if msg["type"] == "ACK": 
-				return
-			else:
-				pass
-
-		except soc.timeout: # fail after 1 second of no activity
-			print("Didn't receive data! [Timeout] Backup Monitor failed in between")
+		msg = _recv_msg(c, MSG_SIZE)
+		if msg == None:
+			pass
+		elif msg["type"] == "ACK": 
+			return
 
 	except:
 		print("MAY GOD HELP US!! WE ARE DOOMED\n\n")
 
-	
 	soc.close()
 
 
@@ -86,7 +79,7 @@ def gossip():
 				port = storage_ip[i+1]["port"]
 
 				soc = socket.socket()
-				soc.settimeout(3)
+				soc.settimeout(5)
 				print ("Socket successfully created for Gossip")
 			
 				try :
@@ -97,14 +90,14 @@ def gossip():
 					
 					msg = {"type": "ALIVE"}
 					_send_msg(soc, msg)
+					time.sleep(3)
 
-					try:
-						rec = _recv_msg(c, 1024)
-						if rec["type"] != "ALIVE": 
-							recovery(node_ip, i+1)
-
-					except soc.timeout: # fail after 1 second of no activity
+					rec = _recv_msg(c, MSG_SIZE)
+					if rec == None: 
 						print(f"Didn't receive data to Storage {i+1} ip {node_ip}! [Timeout] ")
+						recovery(node_ip, i+1)
+
+					elif rec["type"] != "ALIVE": 
 						recovery(node_ip, i+1)
 					
 				except :	
@@ -134,15 +127,16 @@ def heartbeat_protocol():
 		c, addr = s.accept()     
 		print ('Got connection from', addr )
 
-		try:
-			msg = _recv_msg(c, 1024)
-			if msg["type"] != "ALIVE": 
-				res = {"type": "ACK"}
-				_send_msg(c, res)
+		
+		msg = _recv_msg(c, MSG_SIZE)	
 
-		except c.timeout: # fail after 1 second of no activity
+		if msg == None:
 			print(f"Didn't receive data from ip {addr}! [Timeout] ")
 			recovery(addr, None)
+
+		elif msg["type"] != "ALIVE": 
+			res = {"type": "ACK"}
+			_send_msg(c, res)
 
 		c.close()
 

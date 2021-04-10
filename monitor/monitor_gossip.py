@@ -36,25 +36,24 @@ def gossip(c, msg):
 def heartbeat_protocol(soc):
 	# Establish connection with client. 
 	c, addr = s.accept()     
+	c.settimeout(5)
 	print ('Got connection from', addr )
 	
-	# send a thank you message to the client. 
-	try:
-		msg = _recv_msg(c, 1024)
-		print(msg)
+	msg = _recv_msg(c, MSG_SIZE)
+	print(msg)
 
-		if msg["type"] == "ALIVE":
-			res = {"type": "ACK"}
-			_send_msg(c, res)
-
-		elif msg["type"] == "FAIL":
-			res = {"type": "ACK"}
-			_send_msg(c, res)
-			gossip(c, msg)
-
-	except c.timeout: # fail after 1 second of no activity
+	if msg == None:
 		print(f"Didn't receive data! [Timeout] {addr}")
 
+	elif msg["type"] == "ALIVE":
+		res = {"type": "ACK"}
+		_send_msg(c, res)
+
+	elif msg["type"] == "FAIL":
+		res = {"type": "ACK"}
+		_send_msg(c, res)
+		gossip(c, msg)
+		
 	c.close()
 
 
