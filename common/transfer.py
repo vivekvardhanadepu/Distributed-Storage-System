@@ -9,7 +9,32 @@ def _send_msg(socket, msg):
 	socket.send(msg)
 
 def _recv_msg(socket, size):
-	msg = socket.recv(1024)
+	rec_packet = []
+	i = 0
+	print("Waiting packet..")
+	while True:
+		try :
+			socket.settimeout(5)
+			msg = socket.recv(MSG_SIZE)
+			# socket.settimeout(None)
+			print(".")
+			
+			if not msg:
+				break
 
-	r_msg = pickle.loads(msg)
+			rec_packet.append(msg)
+
+		except :
+			break
+		
+	
+	print("Joining packet..")
+	data = b"".join(rec_packet)
+
+	if not data:
+		return None
+	
+	r_msg = pickle.loads(data)
+	# print(r_msg)
+
 	return r_msg
