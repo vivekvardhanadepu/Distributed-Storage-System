@@ -9,10 +9,6 @@ def _send_msg(socket, msg):
 	socket.send(msg)
 
 def _recv_msg(socket, size):
-<<<<<<< HEAD
-	msg = socket.recv(1024)
-	r_msg = pickle.loads(msg)
-=======
 	rec_packet = []
 	i = 0
 	print("Waiting packet..")
@@ -41,5 +37,4 @@ def _recv_msg(socket, size):
 	r_msg = pickle.loads(data)
 	# print(r_msg)
 
->>>>>>> main
 	return r_msg
