@@ -105,7 +105,7 @@ def recv_write_acks():
             client_update.connect(client_addr)
 
             msg = {"type": "WRITE_RESPONSE", "PG_ID": pg_id, \
-                   "status": "SUCCESS", "message": "write successful"\
+                   "status": "SUCCESS", "message": "write successful",\
                    "client_id": client_id} 
 
             _send_msg(client_update, msg)
@@ -119,7 +119,7 @@ def recv_write_acks():
             MDS_update.connect(MDS_addr)
 
             msg = {"type": "WRITE_RESPONSE", "PG_ID": pg_id, \
-                   "status": "SUCCESS", "message": "write successful"\
+                   "status": "SUCCESS", "message": "write successful",\
                    "client_id": client_id} 
 
             _send_msg(MDS_update, msg)
@@ -220,8 +220,9 @@ def recv_client_reqs():
                     break
 
             osd_ids = [hashtable[pg_id][i][0] for i in range(3)]
-            addrs = [(cluster_topology[osd_id]["ip"], cluster_topology[osd_id]["port"]) \
-                            for osd_id in osd_ids]
+
+            for osd_id in osd_ids
+                addrs = {osd_id:(cluster_topology[osd_id]["ip"], cluster_topology[osd_id]["port"])}
             osds_dict = {"osd_ids": osd_ids, "addrs": addrs}
 
             # updating the backup(only hash_table)

@@ -15,6 +15,8 @@ sys.path.insert('../utils/')
 from transfer import _send_msg, _recv_msg
 from storage_gossip import heartbeat_protocol
 
+freespace = 
+
 def recv_client_reqs():
 	s = socket.socket()
     print ("write ack socket successfully created")
@@ -46,23 +48,86 @@ def recv_client_reqs():
         # recv the acknowledgement
         req = _recv_msg(c, 1024)
         print(req)
-
-		# IP, PORT FROM CLIENT
 			
-		if(msg["type"] == "WRITE"):
-			pg = msg["PG"]
+		if(req["type"] == "CLIENT_WRITE"):
+			
+			client_id = req["client_id"]
+			client_addr = req["client_addr"]
+
+			osd_dict = req["osd_dict"]
+
+			for osd_id in osd_dict["osd_ids"]:
+				if osd_id == my_osd_id:
+					continue
+
+				# sending write update to client
+				write_forward_socket = socket.socket()
+				print ("write forward socket successfully created")
+				
+				write_forward_socket.connect(osd_dict["addrs"][osd_id])
+
+				req["type"] = "OSD_WRITE"
+
+				_send_msg(write_forward_socket, req)
+
+				write_forward_socket.close()
+
+			pg = req["pg"]
 			file = open("./data/"+pg.pg_id, 'wb')
 
-			pg_b = pickle.dumps(pg)
-			file.write(pg_b)
+			pg_dump = pickle.dumps(pg)
+			file.write(pg_dump)
 
-			# pickle.dump(pg, file)
 			file.close()
 
-			_send_msg(c, [pg.pg_id, "SUCCESS"])
+			# sending write ack to monitor
+			write_ack_socket = socket.socket()
+			print ("write forward socket successfully created")
+			
+			write_ack_socket.connect(monitor_addr)
+			ack = {}
+			ack["client_id"] = client_id
+			ack["client_addr"] = client_addr # addr = (ip, port)
+			ack["pg_id"] = pg.pg_id
+			ack["free_space"] = freespace - sys.getsizeof(pg_dump)
+			ack["osd_id"] = my_osd_id
 
+			_send_msg(write_ack_socket, ack)
+
+			write_ack_socket.close()
+			
+			# _send_msg(c, [pg.pg_id, "SUCCESS"])
+		
+		elif msg["type"] == "OSD_WRITE":
+			client_id = req["client_id"]
+			client_addr = req["client_addr"]
+
+			pg = req["pg"]
+			file = open("./data/"+pg.pg_id, 'wb')
+
+			pg_dump = pickle.dumps(pg)
+			file.write(pg_dump)
+
+			file.close()
+
+			# sending write ack to monitor
+			write_ack_socket = socket.socket()
+			print ("write forward socket successfully created")
+			
+			write_ack_socket.connect(monitor_addr)
+			ack = {}
+			ack["client_id"] = client_id
+			ack["client_addr"] = client_addr # addr = (ip, port)
+			ack["pg_id"] = pg.pg_id
+			ack["free_space"] = freespace - sys.getsizeof(pg_dump)
+			ack["osd_id"] = my_osd_id
+
+			_send_msg(write_ack_socket, ack)
+
+			write_ack_socket.close()
+			
 		elif msg["type"] == "READ":
-			pg_id = msg["PG_id"]
+			pg_id = msg["pg_id"]
 			file = open("./data/"+pg_id, 'rb')
 
 			pg_b = file.read()
@@ -70,13 +135,12 @@ def recv_client_reqs():
 
 			file.close()
 			# print(pg)
-			msg = {"pg_id": pg.pg_id, "res":"SUCCESS", "PG":pg}
+			msg = {"pg_id": pg.pg_id, "res":"SUCCESS", "pg":pg}
 
 			_send_msg(c, msg)
 
 		c.close()
 
-		print("RECV")
 		print(msg)
 
 	s.close()
@@ -85,11 +149,11 @@ def main():
 	# friends structure
 	# friends = {
 	# 			 "osd_id1" : {
-	# 							"addr" : (ip, port, status),
+	# 							"addr" : (ip, port),
 							  	# "status" : 0
 							#  }
 	# 			 "osd_id2" : {
-	# 							"addr" : (ip, port, status),
+	# 							"addr" : (ip, port),
 							  	# "status" : 0
 							#  }
 	# 			}
@@ -102,8 +166,5 @@ def main():
 	client_reqs_thread = threading.Thread(target=recv_client_reqs)
     heartbeat_thread = threading.Thread(target=heartbeat_protocol)
 	
-
-
-
 if __name__ == '__main__':
 	main()
