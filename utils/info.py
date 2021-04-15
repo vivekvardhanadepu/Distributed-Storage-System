@@ -1,5 +1,9 @@
 """
 @author: Kartik Saini
+@author: Harshit Soora
+@author: Vivek Vardhan Adepu
+@author: Shivang Gupta
+@author: Deepak Imandi
 
 """
 
@@ -48,3 +52,8 @@ storage_ip = {1:storage_1,2:storage_2,3:storage_3,4:storage_4}
 monitor_1 = {"ip":"18.188.179.6", "port":12345}
 monitor_2 = {"ip":"18.219.161.117", "port":12346}
 monitor_ip = {"primary": monitor_1, "backup": monitor_2}
+
+## Vivek's
+
+# PORTS
+1 series: 1234, 1235, 1236, 1237

@@ -61,13 +61,21 @@ def recv_write_acks():
         cluster_topology_dump = cluster_topology_file.read()
         cluster_topology = pickle.loads(cluster_topology_dump)
 
-        hashtable[pg_id][1] = 1
-
+        # need to check this
+        if cluster_topology[osd_id]["status"] != 0:
+            cluster_topology[osd_id]["status"] = 0
+        
+        for i in range(len(hashtable[pg_id])):
+            if hashtable[pg_id][i][0] == osd_id:
+                hashtable[pg_id][i][1] = 1
+        
         for osd in hashtable[pg_id]:
             if osd[0] != osd_id:
                 if osd[1] == 1:
                     cluster_topology[osd_id]["friends"].add(osd[0])
                     cluster_topology[osd[0]]["friends"].add(osd_id)
+
+        # SEND TO THE BACKUP
 
         cluster_topology[osd_id]["free_space"] = free_space
 
@@ -79,7 +87,7 @@ def recv_write_acks():
         cluster_topology_file.write(cluster_topology_dump)
         cluster_topology_file.close()
 
-        # send to the MDS
+        # send to the osd
         c.send("SUCCESS")
 
         c.close()
