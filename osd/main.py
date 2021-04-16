@@ -15,9 +15,11 @@ sys.path.insert('../utils/')
 from transfer import _send_msg, _recv_msg
 from storage_gossip import heartbeat_protocol
 
+my_osd_id = 0
 freespace = 
 
 def recv_client_reqs():
+	global my_osd_id
 	s = socket.socket()
     print ("write ack socket successfully created")
 
@@ -145,7 +147,13 @@ def recv_client_reqs():
 
 	s.close()
 
-def main():
+def main(argc, argv):
+	if argc < 2:
+		print("error: python3 <filename> <osd_id>")
+
+	global osd_id
+	my_osd_id = argv[1]
+
 	# friends structure
 	# friends = {
 	# 			 "osd_id1" : {
@@ -167,4 +175,4 @@ def main():
     heartbeat_thread = threading.Thread(target=heartbeat_protocol)
 	
 if __name__ == '__main__':
-	main()
+	main(len(sys.argv), sys.argv)

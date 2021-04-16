@@ -15,14 +15,16 @@ import sys
 sys.path.insert('../utils/')
 from transfer import _send_msg, _recv_msg
 from monitor.monitor_gossip import heartbeat_protocol
+from info import MDS_IPs, MDS_PORT
 
 hashtable = {}
 cluster_topology = {}
+MDS_addr = MDS_IPs["primary"]
 
 def recv_write_acks():
-    global hashtable, cluster_topology
+    global hashtable, cluster_topology, MDS_addr
 
-    s = socket.socket()
+    write_ack_socket = socket.socket()
     print ("write ack socket successfully created")
 
     # reserve a port on your computer in our
@@ -34,11 +36,11 @@ def recv_write_acks():
     # instead we have inputted an empty string
     # this makes the server listen to requests
     # coming from other computers on the network
-    s.bind(('', port))
+    write_ack_socket.bind(('', port))
     print ("write ack socket bound to %s" %(port))
 
     # put the socket into listening mode
-    s.listen(5)
+    write_ack_socket.listen(5)
     print ("socket is listening")
 
     # a forever loop until we interrupt it or
@@ -46,7 +48,7 @@ def recv_write_acks():
     while True:
 
         # Establish connection with osd
-        c, addr = s.accept()
+        c, addr = write_ack_socket.accept()
         print ('Got connection from', addr)
 
         # recv the acknowledgement
@@ -134,7 +136,7 @@ def recv_write_acks():
 
         c.close()
 
-    s.close()
+    write_ack_socket.close()
 
 
 def recv_inactive_osd():
@@ -220,9 +222,10 @@ def recv_client_reqs():
                     break
 
             osd_ids = [hashtable[pg_id][i][0] for i in range(3)]
-
-            for osd_id in osd_ids
-                addrs = {osd_id:(cluster_topology[osd_id]["ip"], cluster_topology[osd_id]["port"])}
+            
+            addrs = {}
+            for osd_id in osd_ids:
+                addrs[osd_id] = (cluster_topology[osd_id]["ip"], cluster_topology[osd_id]["port"])
             osds_dict = {"osd_ids": osd_ids, "addrs": addrs}
 
             # updating the backup(only hash_table)
