@@ -16,19 +16,65 @@ def replicate_pg(soc):
 	if msg == None:
 		print(f"Didn't receive data! [Timeout] {addr}")
 
-	elif msg["type"] == "REPLICATE":
-		res = {"type": "ACK"}
-		_send_msg(c, res)
-
+	elif msg["type"] == "REPLICATE":		
 		# Can do one thing here
 		# call the func that act as access this pg_id for the client
 		# then call other function that act as send this pg to osd to do a write
 		pg_id = msg["pg_id"]
 		osd_id = msg["osd_id"]
 
-		'''
-		Let me look into Vivek's code and figure out these 
-		Or you can just write those functions and I will do the rest
-		'''
+		file = open("./data/"+pg_id. 'rb')
+
+		pg_b = file.read()
+		pg = pickle.loads(pg_b)
+
+		## Connect to this osd_id with new socket
+		new_soc = socket.socket()
+		print(f"Socket created to send request to SAVE data at OSD {osd_id}")
+
+		ip_add = storage_ip[osd_id]["ip"]
+		port = storage_ip[osd_id]["port"]
+
+		new_soc.connect((ip_add, port))
+		print(f"Connection made with {ip_add} on {port}")
+
+		msg = {"type":"SAVE", "pg_id":pg_id, "pg": pg}
+		_send_msg(new_soc, msg)
+		print("Msg send to SAVE the data")
+
+		time.sleep(3)
+
+		msg = _recv_msg(new_soc, MSG_SIZE)
+		print("Msg received !")
+
+		if msg == None:
+			res = {"type": "REPLICATION FAIL"}
+			_send_msg(c, res)
+			print("Fail Msg send to the monitor")
+
+		elif msg["type"] == "ACK":
+			res = {"type": "ACK"}
+			_send_msg(c, res)
+			print("Success Msg send to the monitor")
+
 		
+	elif msg["type"] == "SAVE":
+		# This will take request from other osd to save some data
+		# This is basic replication strategy 
+		pg_id = msg["pg_id"]
+		pg = msg["pg"]
+
+		file = open("./data/"+ pg_id, 'wb')
+
+		pg_dump = pickle.dump(pg)
+		file.write(pg_dump)
+
+		msg = {"type":"ACK"}
+		_send_msg(msg)
+		print("Write successful..send back Ack to the master osd")
+
+
+	else 
+		print("[ERROR] Check the code in replication")
+
 	c.close()
