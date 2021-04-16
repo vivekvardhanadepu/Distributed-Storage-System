@@ -6,14 +6,14 @@
 @author: Deepak Imandi
 
 """
-
-mds_ip = {"primary":{"ip":"", "port":0}, "backup":{"ip":"", "port":0}}
+# MDS
+MDS_IPs = {"primary":{"ip":"", "port":0}, "backup":{"ip":"", "port":0}}
 
 num_objects_per_file = 1
 
 max_num_objects_per_pg = 1
 
-_port = 9999
+MDS_PORT = 1201
 
 MSG_SIZE = 1024
 HEADERSIZE = 10
@@ -39,21 +39,16 @@ OSD -> replicas ... for monitoring on OSD
 
 """
 
-# Update all the stroage node IP everytime
-storage_1 = {"ip":"18.224.71.170", "port":9991}
-storage_2 = {"ip":"18.221.219.50", "port":9992}
-storage_3 = {"ip":"18.223.120.174", "port":9993}
-storage_4 = {"ip":"18.223.120.174", "port":9994}
+# OSD
+OSD_IPs = {1:"1.5.6.3", 2:"1.5.6.8", 3:"1.2.35.53", 4:"1.5.6.8"}
 
-storage_ip = {1:storage_1,2:storage_2,3:storage_3,4:storage_4}
+READ_WRITE_PORT = 1207
+HEARTBEAT_PORT = 1213
 
 
-# Update all the monitor node IP
-monitor_1 = {"ip":"18.188.179.6", "port":12345}
-monitor_2 = {"ip":"18.219.161.117", "port":12346}
-monitor_ip = {"primary": monitor_1, "backup": monitor_2}
+# MONITOR
+MONITOR_IPs = {"primary": "10.0.2.3", "backup": "1.2.3.4"}
 
-## Vivek's
-
-# PORTS
-1 series: 1234, 1235, 1236, 1237
+CLIENT_REQ_PORT = 1217
+WRITE_ACK_PORT = 1223
+OSD_INACTIVE_STATUS_PORT = 1231

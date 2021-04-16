@@ -15,30 +15,33 @@ import sys
 sys.path.insert('../utils/')
 from transfer import _send_msg, _recv_msg
 from monitor.monitor_gossip import heartbeat_protocol
+from info import MDS_IPs, MDS_PORT, WRITE_ACK_PORT, OSD_INACTIVE_STATUS_PORT, CLIENT_REQ_PORT
 
 hashtable = {}
 cluster_topology = {}
+MDS_IP = MDS_IPs["primary"]
 
 def recv_write_acks():
-    global hashtable, cluster_topology
+    global hashtable, cluster_topology, MDS_IP
 
-    s = socket.socket()
+    write_ack_socket = socket.socket()
     print ("write ack socket successfully created")
+    write_ack_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
     # reserve a port on your computer in our
     # case it is 1234 but it can be anything
-    port = 1234
+    port = WRITE_ACK_PORT
 
     # Next bind to the port
     # we have not entered any ip in the ip field
     # instead we have inputted an empty string
     # this makes the server listen to requests
     # coming from other computers on the network
-    s.bind(('', port))
+    write_ack_socket.bind(('', port))
     print ("write ack socket bound to %s" %(port))
 
     # put the socket into listening mode
-    s.listen(5)
+    write_ack_socket.listen(5)
     print ("socket is listening")
 
     # a forever loop until we interrupt it or
@@ -46,7 +49,7 @@ def recv_write_acks():
     while True:
 
         # Establish connection with osd
-        c, addr = s.accept()
+        c, addr = write_ack_socket.accept()
         print ('Got connection from', addr)
 
         # recv the acknowledgement
@@ -98,33 +101,33 @@ def recv_write_acks():
         cluster_topology_file.close()
 
         if replication_factor > 1:
-            # sending write update to client
-            client_update = socket.socket()
-            print ("client write ack socket successfully created")
+            # # sending write update to client
+            # client_update = socket.socket()
+            # print ("client write ack socket successfully created")
             
-            client_update.connect(client_addr)
+            # client_update.connect(client_addr)
 
-            msg = {"type": "WRITE_RESPONSE", "PG_ID": pg_id, \
-                   "status": "SUCCESS", "message": "write successful",\
-                   "client_id": client_id} 
+            # msg = {"type": "WRITE_RESPONSE", "PG_ID": pg_id, \
+            #        "status": "SUCCESS", "message": "write successful",\
+            #        "client_id": client_id} 
 
-            _send_msg(client_update, msg)
+            # _send_msg(client_update, msg)
 
-            client_update.close()
+            # client_update.close()
 
             # sending write update to MDS
-            MDS_update = socket.socket()
+            MDS_update_socket = socket.socket()
             print ("MDS write ack socket successfully created")
 
-            MDS_update.connect(MDS_addr)
+            MDS_update_socket.connect(MDS_IP, MDS_PORT)
 
             msg = {"type": "WRITE_RESPONSE", "PG_ID": pg_id, \
                    "status": "SUCCESS", "message": "write successful",\
                    "client_id": client_id} 
 
-            _send_msg(MDS_update, msg)
+            _send_msg(MDS_update_socket, msg)
 
-            MDS_update.close()
+            MDS_update_socket.close()
 
         error = ""
         status = "SUCCESS"
@@ -134,27 +137,28 @@ def recv_write_acks():
 
         c.close()
 
-    s.close()
+    write_ack_socket.close()
 
 
 def recv_inactive_osd():
-    s = socket.socket()
+    recv_inactive_osd_socket = socket.socket()
     print ("inactive osd listener socket successfully created")
+    recv_inactive_osd_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
     # reserve a port on your computer in our
     # case it is 1235 but it can be anything
-    port = 1235
+    port = OSD_INACTIVE_STATUS_PORT
 
     # Next bind to the port
     # we have not entered any ip in the ip field
     # instead we have inputted an empty string
     # this makes the server listen to requests
     # coming from other computers on the network
-    s.bind(('', port))
+    recv_inactive_osd_socket.bind(('', port))
     print ("inactive osd listener socket bound to %s" %(port))
 
     # put the socket into listening mode
-    s.listen(5)
+    recv_inactive_osd_socket.listen(5)
     print ("inactive osd listener socket is listening")
 
     # a forever loop until we interrupt it or
@@ -162,7 +166,7 @@ def recv_inactive_osd():
     while True:
 
         # Establish connection with client.
-        c, addr = s.accept()
+        c, addr = recv_inactive_osd.accept()
         print ('Got connection from', addr)
 
         # recv the inactive osd
@@ -170,28 +174,29 @@ def recv_inactive_osd():
 
         # START THE RECOVERY
 
+    recv_inactive_osd_socket.close()
+
 
 def recv_client_reqs():
     global cluster_topology, hashtable
 
-    s = socket.socket()
+    recv_client_reqs_socket = socket.socket()
     print ("client req listener socket successfully created")
+    recv_client_reqs_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
-    # reserve a port on your computer in our
-    # case it is 1236 but it can be anything
-    port = 1236
+    # reserve a port on your computer
+    port = CLIENT_REQ_PORT
 
     # Next bind to the port
     # we have not entered any ip in the ip field
     # instead we have inputted an empty string
     # this makes the server listen to requests
     # coming from other computers on the network
-    reuse socket code
-    s.bind(('', port))
+    recv_client_reqs_socket.bind(('', port))
     print ("client req listener socket bound to %s" %(port))
 
     # put the socket into listening mode
-    s.listen(5)
+    recv_client_reqs_socket.listen(5)
     print ("client req listener socket is listening")
 
     # a forever loop until we interrupt it or
@@ -199,7 +204,7 @@ def recv_client_reqs():
     while True:
 
         # Establish connection with client.
-        c, addr = s.accept()
+        c, addr = recv_client_reqs_socket.accept()
         print ('Got connection from', addr)
         
         # recv the pg_id, size
@@ -220,14 +225,16 @@ def recv_client_reqs():
                     break
 
             osd_ids = [hashtable[pg_id][i][0] for i in range(3)]
-
-            for osd_id in osd_ids
-                addrs = {osd_id:(cluster_topology[osd_id]["ip"], cluster_topology[osd_id]["port"])}
+            
+            addrs = {}
+            for osd_id in osd_ids:
+                addrs[osd_id] = (cluster_topology[osd_id]["ip"], cluster_topology[osd_id]["port"])
             osds_dict = {"osd_ids": osd_ids, "addrs": addrs}
 
             # updating the backup(only hash_table)
             # update_backup_monitor("hash_table", [pg_id], [hashtable[pg_id]])
 
+            hashtable_file = open('hashtable', 'wb')
             hashtable_dump = pickle.dumps(hashtable)
             hashtable_file.write(hashtable_dump)
             hashtable_file.close()
@@ -244,7 +251,7 @@ def recv_client_reqs():
 
         c.close()
 
-    s.close()
+    recv_client_reqs_socket.close()
             
 
 def main():
@@ -288,11 +295,11 @@ def main():
 
     global hashtable, cluster_topology
 
-    hashtable_file = open('hashtable', 'r+b')
+    hashtable_file = open('hashtable', 'rb')
     hashtable_dump = hashtable_file.read()
     hashtable = pickle.loads(hashtable_dump)
 
-    cluster_topology_file = open('cluster_topology', 'r+b')
+    cluster_topology_file = open('cluster_topology', 'rb')
     cluster_topology_dump = cluster_topology_file.read()
     cluster_topology = pickle.loads(cluster_topology_dump)
 
