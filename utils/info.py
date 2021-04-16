@@ -7,13 +7,14 @@
 
 """
 # MDS
-MDS_IPs = {"primary":{"ip":"", "port":0}, "backup":{"ip":"", "port":0}}
+MDS_PORT = 1201
+MDS_IPs = {"primary":{"ip":"3.19.55.179", "port":MDS_PORT+1}, "backup":{"ip":"3.17.5.124", "port":MDS_PORT}}
 
 num_objects_per_file = 1
 
 max_num_objects_per_pg = 1
 
-MDS_PORT = 1201
+
 
 MSG_SIZE = 1024
 HEADERSIZE = 10
@@ -40,12 +41,15 @@ OSD -> replicas ... for monitoring on OSD
 """
 
 # OSD
-OSD_IPs = {1:"1.5.6.3", 2:"1.5.6.8", 3:"1.2.35.53", 4:"1.5.6.8"}
+OSD_IPs = {1:"3.19.55.179", 2:"34.224.4.5", 3:"54.90.61.223", 4:"1.5.6.8"}
+
 READ_WRITE_PORT = 1207
 HEARTBEAT_PORT = 1213
 
+
 # MONITOR
-MONITOR_IPs = {"primary": "10.0.2.3", "backup": "1.2.3.4"}
+MONITOR_IPs = {"primary": "34.224.4.5", "backup": "1.2.3.4"}
+
 CLIENT_REQ_PORT = 1217
 WRITE_ACK_PORT = 1223
 OSD_INACTIVE_STATUS_PORT = 1231

@@ -2,41 +2,45 @@ import pickle
 client1 = {
 	"username":"client1",
 	"client_id":"C1",
-	"last_file_id":0,
-	"root":{
-		"dir1":{0:["text1.txt",["p1"]], 1:["vv.cpp", ["p2"]]}, # dir = {file_id:[file_name, [list of PG ids]]}
+	"dir_tree":{
+		"root":{},
+		"dir1":{0:["text1.txt",["p0"]], 1:["vv.cpp", ["p2"]]}, # dir = {file_id:[file_name, [list of PG ids]]}
 		"dir2":{}
-	}
+	},
+	"processing":{} # {"pg_id":["dir","file_id", filename, 0]} 0:waiting 1: writtens
 }
 
 client2 = {
 	"username":"client2",
 	"client_id":"C2",
-	"last_file_id":0,
-	"root":{
+	"dir_tree":{
+		"root":{},
 		"dir1":{}, # dir = {file_id:[list of PG ids]}
 		"dir2":{}
-	}
+	},
+	"processing":{}
 }
 
 client3 = {
 	"username":"client3",
 	"client_id":"C3",
-	"last_file_id":0,
-	"root":{
+	"dir_tree":{
+		"root":{},
 		"dir1":{}, # dir = {file_id:[list of PG ids]}
 		"dir2":{}
-	}
+	},
+	"processing":{}
 }
 
 client4 = {
 	"username":"client4",
 	"client_id":"C4",
-	"last_file_id":0,
-	"root":{
+	"dir_tree":{
+		"root":{},
 		"dir1":{}, # dir = {file_id:[list of PG ids]}
 		"dir2":{}
-	}
+	},
+	"processing":{}
 }
 
 user_list = {

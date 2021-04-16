@@ -1,8 +1,3 @@
-# import gui
-from info import mds_ip, monitor_ip, num_objects_per_file, max_num_objects_per_pg, MSG_SIZE, HEADERSIZE
-from object_pg import DataObject, PlacementGroup 
-from transfer import _send_msg, _recv_msg
-
 import tkinter as tk 
 from tkinter import filedialog
 import socket
@@ -10,14 +5,21 @@ import sys
 import pickle
 import os
 from functools import partial
-#%%
+import time
+import threading
+
+sys.path.insert(1, '../utils/')
+from info import MDS_IPs, MONITOR_IPs, CLIENT_REQ_PORT, MSG_SIZE
+from object_pg import DataObject, PlacementGroup 
+from transfer import _send_msg, _recv_msg, _wait_recv_msg
+
 
 class Client:
 	client_id = None
 	
 	latest_file_id = 1
 	dir_tree = {}
-	curr_dir = "dir1"
+	curr_dir = "root"
 	logged_in = False
 	
 	window_name = "Distributed Storage Service - "
@@ -27,34 +29,96 @@ class Client:
 	def __init__(self, tree):
 		self.client_id = tree["client_id"]
 		self.username = tree["username"]
-		self.dir_tree = tree["root"]
-		self.latest_file_id = tree["last_file_id"]
+		self.dir_tree = tree["dir_tree"]
+		# self.latest_file_id = tree["last_file_id"]
+		self.processing = tree["processing"]
 		self.logged_in = True
 		self.gui()
-		
+		self.start_update_handler = False # True if some file is processing for upload
+		self.update_interval = 2 # 2 sec interval for checking updates on file upload
+		# self.write_update_recv = False
+
+	def update_handler(self):
+
+		# if n == 0:
+		print("update handler started..")
+		if self.start_update_handler == True:
+
+			while True:
+				time.sleep(self.update_interval)
+				if len(self.processing) == 0:
+					self.start_update_handler = False
+					break
+
+				msg = {"type":"WRITE_QUERY", "username":self.username, "processing":self.processing}
+
+				s = socket.socket()         
+				
+				ip = MDS_IPs["primary"]["ip"]
+				port = MDS_IPs["primary"]["port"]
+				# print(s.gethostname())      
+				s.bind(('', 9090))        
+				  
+				try:
+					s.connect((ip, port)) 
+
+					_send_msg(s, msg)
+					
+					response = _wait_recv_msg(s, MSG_SIZE)
+
+					s.close()
+					if response["status"] == "SUCCESS": # here check response from mds
+						print(response["msg"])
+						file_written = response["file_written"]
+						
+						for file in file_written:
+							self._popup("Update", str(file)+" UPLOADED SUCCESSFULLY")
+						
+						tree = response["tree"]
+						self.dir_tree = tree["dir_tree"]
+						self.processing = tree["processing"]
+						# update on GUI
+
+						for filename in file_written: #populate listbox again
+							self.listbox.insert(END, filename)
+						self.window.mainloop()
+					elif response["status"] == "NO_UPD":
+						print(response["msg"])
+
+				except Exception as e:
+					s.close()
+					print("Update failed")
+					print(e)
+
+				finally:
+					print("Exiting login..")
+
+
 	def upload(self, file_path):
 		if not self.logged_in:
 			self.gui._print("Not logged in")
 			return 
 		
 		file_id, pg_list = self._chunker(file_path)
-		
+		file_name = os.path.basename(file_path)
 		## send to OSD using sockets ; ask IP to monitor
 		## using _write function
-		
+		pg_data = [self.curr_dir, file_id, filename, 0]
 		res = -1
 		for pg in pg_list:
 			while res == -1:
-				res = self._write(pg)
+				res = self._write(pg, pg_data)
 				if res == -2:
 					print("UPLOAD failed")
+				elif res == 0:
+					print("file sent - waiting for response")
 			res = -1
 		
-		file_name = os.path.basename(file_path)
-		self.dir_tree[self.curr_dir][file_id] = [file_name, [pg.pg_id for pg in pg_list]]
 		
-		print(self.dir_tree)
-		self._print("[UPLOAD]", "Succesful")
+		# self.dir_tree[self.curr_dir][file_id] = [file_name, [pg.pg_id for pg in pg_list]]
+		
+		# print(self.dir_tree)
+		# self._print("[UPLOAD]", "Succesful")
 	
 	def download(self, file_id):
 		file_name = self.dir_tree[self.curr_dir][file_id][0]
@@ -67,6 +131,7 @@ class Client:
 				res, pg = self._read(pg_id)
 				if res == -2:
 					print("DOWNLOAD failed")
+
 			res = -1
 
 		for obj in pg.object_list:
@@ -84,76 +149,88 @@ class Client:
 		s = socket.socket()         
 		
 		# send monitor to ask for OSD details
-		ip = monitor_ip["primary"]["ip"]
-		port = monitor_ip["primary"]["port"]                
+		ip = MONITOR_IPs["primary"]
+		port = CLIENT_REQ_PORT               
 		  
 		
 		s.connect((ip, port)) 
 		
-		msg = {"type":"DOWNLOAD", "PG_id":pg_id}
+		msg = {"type":"READ", "PG_id":pg_id}
 		# d_msg = pickle.dumps(msg)
 		
 		_send_msg(s, msg)
 		#s.send(d_msg)
-		response = _recv_msg(s, 1024)
+		response = _wait_recv_msg(s, 1024)
 		
-		osd_ips = response["osd_ip"]
+		osd_addr = response["addrs"][0]
 		
 		# print(osd_ips)
 		s.close() 
 		# print(osd_ips[0][0], osd_ips[0][1])
 		# write on OSD
 		s = socket.socket()
-		s.connect((osd_ips[0][0], osd_ips[0][1]))
+		s.connect(osd_addr)
 		data_msg = {"type":"READ", "PG_id":pg_id}
 		_send_msg(s, data_msg)
 		
-		osd_response = _recv_msg(s, 1024)
+		osd_response = _wait_recv_msg(s, 1024)
 		
 		# print(osd_response)
 		# print(osd_response["pg_id"] == pg_id)
 		# print(osd_response["res"] == "SUCCESS")
 
 		if osd_response["pg_id"] == pg_id and osd_response["res"] == "SUCCESS":
+			s.close()
 			return 0, osd_response["PG"]
 		
 		else:
+			s.close()
 			return -2, None
 	
-	def _write(self, pg):
+	def _write(self, pg, pg_data):
 		s = socket.socket()         
 		
 		# send monitor to ask for OSD details
-		ip = monitor_ip["primary"]["ip"]
-		port = monitor_ip["primary"]["port"]                
+		ip = MONITOR_IPs["primary"]
+		port = CLIENT_REQ_PORT              
 		  
 		
 		s.connect((ip, port)) 
 		
-		msg = {"type":"UPLOAD", "PG_id":pg.pg_id, "size":size(pg)}
+		msg = {"type":"WRITE", "PG_id":pg.pg_id, "size":size(pg)}
 		# d_msg = pickle.dumps(msg)
 		
 		_send_msg(s, msg)
 		#s.send(d_msg)
-		response = _recv_msg(s, MSG_SIZE)
+		osd_dict = _recv_msg(s, MSG_SIZE)
 		
-		osd_ips = response["osd_ip"]
+		# osd_dict = response["osd_dict"]
 		
 		# print(osd_ips)
 		s.close() 
 		# print(osd_ips[0][0], osd_ips[0][1])
 		# write on OSD
+		osd_addr = osd_dict["addrs"][osd_dict["osd_ids"][0]]
 		s = socket.socket()
-		s.connect((osd_ips[0][0], osd_ips[0][1]))
-		data_msg = {"type":"WRITE", "PG":pg}
+		s.connect(osd_addr)
+		data_msg = {"type":"CLIENT_WRITE", "PG":pg, "client_id":self.username, "client_addr":"", "osd_dict":osd_dict}
 		_send_msg(s, data_msg)
 		
-		osd_response = _recv_msg(s, 1024)
+		### Add server to receive response 
+		osd_response = _wait_recv_msg(s, 1024)
 		
-		if osd_response[0] == pg.pg_id and osd_response[1] == "SUCCESS":
+		if osd_response["status"] == "RECEIVED":
+			print("file sent to OSD")
+			self.processing[pg.pg_id] = pg_data
+			if self.start_update_handler == False:
+				self.start_update_handler = True
+				threading.Thread(target=self.update_handler())
+			s.close()
 			return 0
 		
 		else:
+			s.close()
+			print("Error - File not sent")
 			return -2
 	
 	def _chunker(self, file_path):
@@ -161,8 +238,12 @@ class Client:
 		data = file.read()
 		#size = sys.getsizeof(file)
 		# print(data)
-
-		file_id = self.latest_file_id+1
+		file_ids = []
+		for d in self.dir_tree.keys():
+			for file_id in self.dir_tree[d].keys():
+				file_ids.append(file_id)
+		
+		file_id = max(file_ids)+1
 		object_id = self.client_id+"_"+str(file_id)+"_OBJ"+str(0)
 		object_index = 0
 		
@@ -267,7 +348,7 @@ class Client:
 		print(file_path)
 		file_name = os.path.basename(file_path)
 
-		# self.download(self.file_id_map[file_name])
+		self.download(self.file_id_map[file_name])
 
 	def upload_file():
 		filename = self.file_entry.get()
@@ -277,20 +358,21 @@ class Client:
 		msg = {"type":"CLIENT_LOGOUT", "username":self.username}
 
 		s = socket.socket()         
-		
-		ip = mds_ip["primary"]["ip"]
-		port = mds_ip["primary"]["port"]                
+		s.bind(('', 9090))
+		ip = MDS_IPs["primary"]["ip"]
+		port = MDS_IPs["primary"]["port"]                
 		  
 		try:
 			s.connect((ip, port)) 
 
 			_send_msg(s, msg)
 			
-			response = _recv_msg(s, MSG_SIZE)
+			response = _wait_recv_msg(s, MSG_SIZE)
 
 
 			if response["status"] == "SUCCESS": # here check response from mds
 				self.window.destroy()
+				print(response["msg"])
 
 			elif response["status"] == "ERROR":
 				print(response["msg"])
@@ -308,8 +390,15 @@ class Client:
 
 
 
-	def _print(self, title, msg):
+	def _popup(self, title, msg):
 		print(title, msg)
+		popup = tk.Toplevel()
+		popup.wm_title(title)
+		label = tk.Label(popup, text=msg)
+		label.pack(fill='x', padx=50, pady=5)
+		B1 = tk.Button(popup, text="Okay", command = popup.destroy)
+		B1.pack()
+		popup.mainloop()
 	
 	
 #w = window()
@@ -326,7 +415,11 @@ def LoginPage():
 	user = tk.StringVar()
 	passwd = tk.StringVar()
 	login_screen.title("Login")
-	login_screen.geometry("300x250")
+
+	width= login_screen.winfo_screenwidth()  
+	height= login_screen.winfo_screenheight() 
+
+	login_screen.geometry("%dx%d" % (width, height))
 	tk.Label(login_screen, text="Please enter login details").pack()
 	tk.Label(login_screen, text="").pack()
 	tk.Label(login_screen, text="Username").pack()
@@ -356,17 +449,19 @@ def login():
 
 	s = socket.socket()         
 	
-	ip = mds_ip["primary"]["ip"]
-	port = mds_ip["primary"]["port"]                
+	ip = MDS_IPs["primary"]["ip"]
+	port = MDS_IPs["primary"]["port"]
+	# print(s.gethostname())      
+	s.bind(('', 9090))        
 	  
 	try:
 		s.connect((ip, port)) 
 
 		_send_msg(s, msg)
 		
-		response = _recv_msg(s, MSG_SIZE)
+		response = _wait_recv_msg(s, MSG_SIZE)
 
-
+		s.close()
 		if response["status"] == "SUCCESS": # here check response from mds
 			print(response["msg"])
 			login_screen.destroy()
@@ -377,13 +472,13 @@ def login():
 			print(response["msg"])
 
 	except Exception as e:
-
+		s.close()
 		print("[ERROR] login failed")
 		print(e)
 
 	finally:
 		print("Exiting login..")
-		s.close()
+		
 
 if __name__ == '__main__':
 	LoginPage()

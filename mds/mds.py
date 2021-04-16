@@ -1,11 +1,13 @@
-from info import mds_ip, monitor_ip, num_objects_per_file, max_num_objects_per_pg, MSG_SIZE, HEADERSIZE
-from object_pg import DataObject, PlacementGroup 
-from transfer import _send_msg, _recv_msg
-
 from threading import Thread
 import socket
 import sys
 import pickle
+
+sys.path.insert(1, '../utils/')
+from info import MDS_IPs, MSG_SIZE
+from object_pg import DataObject, PlacementGroup 
+from transfer import _send_msg, _recv_msg, _wait_recv_msg
+
 
 class MetadataServ:
 	mds_socket = None
@@ -20,12 +22,13 @@ class MetadataServ:
 	logged_in = []
 	is_primary = True
 
-	def __init__(self):
+	def __init__(self, isPrimary):
+		self.is_primary = isPrimary
 		# mds_port = 0
 		if self.is_primary == True:
-			self.mds_port = mds_ip["primary"]["port"]
+			self.mds_port = MDS_IPs["primary"]["port"]
 		else:
-			self.mds_port = mds_ip["backup"]["port"]
+			self.mds_port = MDS_IPs["backup"]["port"]
 
 		self.mds_socket = socket.socket()
 		self.mds_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -85,6 +88,14 @@ class MetadataServ:
 			elif msg["type"] == "CLIENT_LOGOUT":
 				res = self._logout_handle(msg)
 				print(res["msg"])
+
+			elif msg["type"] == "WRITE_RESPONSE":
+				res = self.update_handle(msg)
+				print(res["msg"])
+
+			elif msg["type"] == "WRITE_QUERY":
+				res = self._client_query_handle(msg)
+				print(res["msg"])
 			
 			try:
 				_send_msg(c, res)
@@ -124,6 +135,35 @@ class MetadataServ:
 					self._write_logged_in()
 					res["status"] = "SUCCESS"
 
+				elif msg["update_type"] == "WRITE_SUCCESS":
+					username = msg["user"]
+					tree = self._read_tree(username)
+
+					pg_id = msg["pg_id"]
+					direc = tree["processing"][pg_id][0]
+					file_id = tree["processing"][pg_id][1]
+					filename = tree["processing"][pg_id][2]
+
+					tree["dir_tree"][direc][file_id] = [filename, [pg_id]]
+					tree["processing"][pg_id][3] = 1
+					self._write_tree(username, tree)
+					res["status"] = "SUCCESS"
+
+				elif msg["update_type"] == "UPDATE_PROCESSING":
+					username = msg["username"]
+					pg_written = msg["pg_written"]
+					pg_wait = msg["pg_wait"]
+					
+					tree = self._read_tree(username)
+
+					for pg_id in pg_written:
+						tree["processing"].pop(pg_id)
+					for pg_id in pg_wait.keys():
+						tree["processing"][pg_id] = pg_wait[pg_id]
+
+					self._write_tree(username, tree)
+					res["status"] = "SUCCESS"
+
 			else:
 				res["status"] = "ERROR"
 				res["msg"] = "msg type not define !"
@@ -135,24 +175,92 @@ class MetadataServ:
 			finally:
 				c.close()
 
-	def update_handle(self): # update will come from Monitor in cluster
-		pass
+	def update_handle(self, msg): # update will come from Monitor in cluster
+		res = {"status":"", "pg_id":msg["PG_ID"], "msg":""}
+		if msg["status"] == "SUCESS":
+			username = msg["client_id"]
+			tree = self._read_tree(username)
+			pg_id = msg["PG_ID"]
 
-	def client_handle(self): # handle for logged in clients
-		# while True: 
-		# 	# Establish connection with client. 
-		# 	c, addr = self.client_socket.accept()     
-		# 	print ('Got Msg from Client ', addr )
-			  
-		# 	msg = _recv_msg(c, MSG_SIZE)
-			
-		# 	print(msg)
-			
-				
-			
-		# 	_send_msg(c, res)
-		# 	c.close()
-		pass
+			if pg_id in tree["processing"].keys():
+				direc = tree["processing"][pg_id][0]
+				file_id = tree["processing"][pg_id][1]
+				filename = tree["processing"][pg_id][2]
+				if direc in tree["dir_tree"].keys():
+					update = {"pg_id":pg_id, "user":username}
+					r = self._update_primary("WRITE_SUCCESS", update)
+					if r == 0:
+						tree["dir_tree"][direc][file_id] = [filename, [pg_id]]
+						tree["processing"][pg_id][3] = 1
+						self._write_tree(username, tree)
+
+						res["status"] = "SUCCESS"
+						res["msg"] = "write update successful"
+					else:
+						# handle backup error
+						res["status"] = "ERROR"
+						res["msg"] = "Error from Backup MDS"
+			else:
+				res["status"] = "ERROR"
+				res["msg"] = "Request for this PG not received from Client"
+		return res
+
+
+	def _client_query_handle(self, msg): # handle for logged in clients
+		username = msg["username"]
+		client_processing = msg["processing"]
+		pg_written = []
+		pg_wait = {}
+
+		tree = self._read_tree(username)
+		mds_processing = tree["processing"]
+
+		# looking for which pg's are written
+		for pg_id in client_processing.keys():
+			if pg_id in mds_processing.keys():
+				if mds_processing[pg_id][3] == 1:
+					pg_written.append(pg_id)
+
+			else:
+				# considering new pg id to include in waiting
+				pg_wait[pg_id] = client_processing[pg_id]
+
+		# update processing lists on primary and backup
+		update = {"username":username, "pg_written":pg_written, "pg_wait":pg_wait}
+
+		#update on backup first
+		r = self._update_primary("UPDATE_PROCESSING", update)
+
+		res = {"status":"", "tree": None, "msg": "", "file_written":[]}
+
+		file_written = [] # sending uploaded file names to client
+
+		# if successful update on backup , now update on primary
+		if r==0:
+			for pg_id in pg_written:
+				file_written.append("/"+str(tree["processing"][pg_id][0])+"/"+str(tree["processing"][pg_id][2])) # filename in processing list
+				tree["processing"].pop(pg_id)
+			for pg_id in pg_wait.keys():
+				tree["processing"][pg_id] = pg_wait[pg_id]
+
+			self._write_tree(username, tree)
+			if len(pg_written) >0:
+				res["status"] = "SUCCESS"
+				res["tree"] = tree
+			else:
+				res["status"] = "NO_UPD"
+				res["tree"] = None
+			res["msg"] = "write update successful"
+
+		else:
+			# if error from backup then no update to client
+			res["status"] = "NO_UPD"
+			res["tree"] = None
+			res["msg"] = "Error from backup in update query"
+		res["file_written"] = file_written
+
+		return res
+
 	def _login_handle(self, msg):
 		res = {"status":"", "tree": "", "msg": ""}
 
@@ -223,8 +331,8 @@ class MetadataServ:
 		s = socket.socket()         
 		
 		# send backup mds to make data consistent
-		ip = mds_ip["backup"]["ip"]
-		port = mds_ip["backup"]["port"]                
+		ip = MDS_IPs["backup"]["ip"]
+		port = MDS_IPs["backup"]["port"]                
 		 
 		try:
 			s.connect((ip, port)) 
@@ -234,7 +342,7 @@ class MetadataServ:
 			
 			_send_msg(s, msg)
 			#s.send(d_msg)
-			response = _recv_msg(s, 1024)
+			response = _wait_recv_msg(s, 1024)
 
 			if response["status"] == "SUCCESS":
 				if update_type == "ADD_LOGIN_USER":
@@ -245,7 +353,6 @@ class MetadataServ:
 				elif update_type == "REMOVE_LOGIN_USER":
 					self.logged_in.remove(update["user"])
 					self._write_logged_in()
-					
 
 				print("Successfully updated on Backup")
 				return 0
@@ -274,6 +381,14 @@ class MetadataServ:
 		file.close()
 
 		return tree
+
+	def _write_tree(self, username, tree):
+		file = open("./tree/"+username, 'wb')
+
+		obj_b = pickle.dumps(tree)
+		file.write(obj_b)
+
+		file.close()
 
 	def _delete_tree(self, client_id):
 		pass
@@ -308,4 +423,8 @@ class MetadataServ:
 
 
 if __name__ == "__main__":
-	mds = MetadataServ()
+	if len(sys.argv) != 2:
+		print("$ python3 mds.py primary")
+		exit(0)
+	isPrimary = (sys.argv[1] == "primary")
+	mds = MetadataServ(isPrimary)
