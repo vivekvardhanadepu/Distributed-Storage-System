@@ -16,7 +16,7 @@ sys.path.insert(1, '../utils/')
 from transfer import _send_msg, _recv_msg, _wait_recv_msg
 from monitor_gossip import heartbeat_protocol
 from info import MDS_IPs, MDS_PORT, WRITE_ACK_PORT, OSD_INACTIVE_STATUS_PORT, CLIENT_REQ_PORT, \
-                    RECV_PRIMARY_UPDATE
+                    RECV_PRIMARY_UPDATE_PORT, MSG_SIZE
 
 hashtable = {}
 MDS_flags = {}
@@ -28,42 +28,77 @@ MDS_IP = MDS_IPs["primary"]["ip"]
 # osd_list       = osd_ids list corresponding to pg_id,  if update_type == "hashtable"
 #                  osd_data,                             else
 def update_backup_monitor(update_type, pg_or_osd_ids_list, osd_list):
-    # if update_type == "hash_table":
-    #     for i in range(len(pg_or_osd_ids_list)):
-    #         hashtable[pg_or_osd_ids_list[i]] = osd_list[i]
-    # else:
-    #     for i in range(len(pg_or_osd_ids_list)):
-    #         cluster_topology[pg_or_osd_ids_list[i]] = osd_list[i]
-    pass
+    primary_update_socket = socket.socket()
+    print ("primary update socket successfully created")
+
+    try:
+        primary_update_socket.connect((MDS_IPs["backup"], RECV_PRIMARY_UPDATE_PORT))
+        msg = {"update_type": update_type, "pg_or_osd_ids_list": pg_or_osd_ids_list, \
+                    "osd_list": osd_list}
+        _send_msg(primary_update_socket, msg)
+        response = _wait_recv_msg(primary_update_socket, MSG_SIZE)
+        primary_update_socket.close()
+        if response["status"] == "SUCCESS":
+            print("written to monitor backup successfully")
+        else:
+            print("write to monitor backup failed")
+    except Exception as e:
+        print(e)
+        primary_update_socket.close()
 
 def recv_primary_update():
-    # recv_primary_update_socket = socket.socket()
-    # print ("primary update socket successfully created")
-    # recv_primary_update_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    recv_primary_update_socket = socket.socket()
+    print ("recv primary update socket successfully created")
+    recv_primary_update_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
-    # # reserve a port on your computer
-    # port = RECV_PRIMARY_UPDATE
+    # reserve a port on your computer
+    port = RECV_PRIMARY_UPDATE_PORT
 
-    # # Next bind to the port
-    # # we have not entered any ip in the ip field
-    # # instead we have inputted an empty string
-    # # this makes the server listen to requests
-    # # coming from other computers on the network
-    # recv_primary_update_socket.bind(('', port))
-    # print ("primary update socket bound to %s" %(port))
+    # Next bind to the port
+    # we have not entered any ip in the ip field
+    # instead we have inputted an empty string
+    # this makes the server listen to requests
+    # coming from other computers on the network
+    recv_primary_update_socket.bind(('', port))
+    print ("primary update socket bound to %s" %(port))
 
-    # # put the socket into listening mode
-    # recv_primary_update_socket.listen(5)
-    # print ("socket is listening")
+    # put the socket into listening mode
+    recv_primary_update_socket.listen(5)
+    print ("primary update socket is listening")
 
-    # # a forever loop until we interrupt it or
-    # # an error occurs
-    # while True:
+    # a forever loop until we interrupt it or
+    # an error occurs
+    while True:
 
-    #     # Establish connection with osd
-    #     c, addr = recv_primary_update_socket.accept()
-    #     print ('Got connection from', addr)
-    pass
+        # Establish connection with osd
+        c, addr = recv_primary_update_socket.accept()
+        print ('Got connection from', addr)
+
+        # recv the update
+        update = _recv_msg(c, 1024)
+        print(update)
+
+        if update["update_type"] == "hash_table":
+            for i in range(len(update["pg_or_osd_ids_list"])):
+                hashtable[update["pg_or_osd_ids_list"][i]] = update["osd_list"][i]
+        else:
+            for i in range(len(update["pg_or_osd_ids_list"])):
+                cluster_topology[update["pg_or_osd_ids_list"][i]] = update["osd_list"][i]
+        
+        hashtable_file = open('hashtable', 'wb')
+        hashtable_dump = pickle.dumps(hashtable)
+        hashtable_file.write(hashtable_dump)
+        hashtable_file.close()
+
+        cluster_topology_file = open('cluster_topology', 'wb')
+        cluster_topology_dump = pickle.dumps(cluster_topology)
+        cluster_topology_file.write(cluster_topology_dump)
+        cluster_topology_file.close()
+
+        # send the acknowledgement
+        c.close()
+
+    recv_primary_update_socket.close()
 
 def recv_write_acks():
     global hashtable, cluster_topology, MDS_IP, MDS_flags
@@ -272,20 +307,28 @@ def recv_client_reqs():
 
             i = 0
             for osd_id in cluster_topology:
-                if cluster_topology[osd_id]["free_space"] > size:
+                if cluster_topology[osd_id]["free_space"] > size and cluster_topology[osd_id]["status"] == 0:
                     hashtable[pg_id].append([osd_id, 0])
                     i = i+1
 
                 if(i>2):
                     break
+            
+            if i < 3:
+                print("less than two osds are free/alive")
+                response = {"status":"ERROR", "msg": "sufficent storage not available"}
+                _send_msg(c, response)
+                c.close()
+                continue
 
+                
             osd_ids = [osd[0] for osd in hashtable[pg_id]]
             
             addrs = {}
             for osd_id in osd_ids:
                 addrs[osd_id] = (cluster_topology[osd_id]["ip"], cluster_topology[osd_id]["port"])
-            osds_dict = {"osd_ids": osd_ids, "addrs": addrs}
-
+            osd_dict = {"osd_ids": osd_ids, "addrs": addrs}
+            response = {"osd_dict": osd_dict, "status":"SUCCESS", "msg": "written succefully"}
             # updating the backup(only hash_table)
             # update_backup_monitor("hash_table", [pg_id], [hashtable[pg_id]])
 
@@ -294,7 +337,7 @@ def recv_client_reqs():
             hashtable_file.write(hashtable_dump)
             hashtable_file.close()
 
-            _send_msg(c, osds_dict)
+            _send_msg(c, response)
 
         elif req["type"] == "READ":
             pg_id = req["pg_id"]

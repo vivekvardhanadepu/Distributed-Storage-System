@@ -30,7 +30,7 @@ def main():
                         1:
                         {
                             "ip":OSD_IPs[1],
-                            "port":1207,#READ_WRITE_PORT,
+                            "port":READ_WRITE_PORT,
                             "free_space":1000,
                             "status":0,
                             "friends_update":False,            
@@ -40,7 +40,7 @@ def main():
                         2:
                         {
                             "ip":OSD_IPs[2],
-                            "port":1208,#READ_WRITE_PORT,
+                            "port":READ_WRITE_PORT,
                             "free_space":1000,
                             "status":0,
                             "friends_update":False,
@@ -50,7 +50,7 @@ def main():
                         3:
                         {
                             "ip":OSD_IPs[3],
-                            "port":1209,#READ_WRITE_PORT,
+                            "port":READ_WRITE_PORT,
                             "free_space":1000,
                             "status":0,
                             "friends_update":False,
@@ -60,7 +60,7 @@ def main():
                         4:
                         {
                             "ip":OSD_IPs[4],
-                            "port":1210,#READ_WRITE_PORT,
+                            "port":READ_WRITE_PORT,
                             "free_space":1000,
                             "status":0,
                             "friends_update":False,

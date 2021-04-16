@@ -80,9 +80,12 @@ class Client:
 						self.processing = tree["processing"]
 						# update on GUI
 
+						# self._update_canvas()
 						for filename in file_written: #populate listbox again
 							self.listbox.insert(END, filename)
-						tk.mainloop()
+							# listbox.insert(END, percent)
+							self.listbox.update_idletasks()
+						# tk.mainloop()
 						# self.window.mainloop()
 					elif response["status"] == "NO_UPD":
 						print(response["msg"])
@@ -91,13 +94,13 @@ class Client:
 
 				except Exception as e:
 					s.close()
-					print("Update failed")
+					print("Update (write) from MDS failed")
 					print(e)
 					time.sleep(self.update_interval)
 				
 
 				finally:
-					print("Exiting login..")
+					
 					time.sleep(self.update_interval)
 				
 
@@ -111,7 +114,7 @@ class Client:
 
 		if file_id < 0:
 			return
-			
+
 		filename = os.path.basename(file_path)
 		## send to OSD using sockets ; ask IP to monitor
 		## using _write function
@@ -219,8 +222,16 @@ class Client:
 		
 		_send_msg(s, msg)
 		#s.send(d_msg)
-		osd_dict = _wait_recv_msg(s, MSG_SIZE)
-		print(osd_dict)
+		res = _wait_recv_msg(s, MSG_SIZE)
+		osd_dict = {}
+
+		if res["status"] == "SUCCESS":
+			osd_dict = res["osd_dict"]
+
+		else:
+			print(res["msg"])
+			s.close()
+			return -2
 		# osd_dict = response["osd_dict"]
 		
 		# print(osd_ips)
@@ -266,8 +277,10 @@ class Client:
 		for d in self.dir_tree.keys():
 			for file_id in self.dir_tree[d].keys():
 				file_ids.append(file_id)
+		file_id = 0
+		if len(file_ids) > 0:
+			file_id = max(file_ids)+1
 		
-		file_id = max(file_ids)+1
 		object_id = self.client_id+"_"+str(file_id)+"_OBJ"+str(0)
 		object_index = 0
 		
@@ -353,6 +366,7 @@ class Client:
 
 		self.window.mainloop()
 	
+
 	def browseFiles(self):
 		filename = filedialog.askopenfilename(initialdir = "/",
 											title = "Select a File",
@@ -433,6 +447,16 @@ login_screen=None
 user = None
 passwd = None
 
+def _popup(title, msg):
+		print(title, msg)
+		popup = tk.Toplevel()
+		popup.wm_title(title)
+		label = tk.Label(popup, text=msg)
+		label.pack(fill='x', padx=50, pady=5)
+		B1 = tk.Button(popup, text="Okay", command = popup.destroy)
+		B1.pack()
+		popup.mainloop()
+
 def LoginPage():
 	global user, passwd, login_screen
 	login_screen=tk.Tk()
@@ -493,12 +517,15 @@ def login():
 			
 
 		elif response["status"] == "ERROR":
-			print(response["msg"])
+			# print(response["msg"])
+			_popup("Login Failed", response["msg"])
 
 	except Exception as e:
 		s.close()
+
 		print("[ERROR] login failed")
 		print(e)
+		_popup("Login Failed", response["msg"])
 
 	finally:
 		print("Exiting login..")

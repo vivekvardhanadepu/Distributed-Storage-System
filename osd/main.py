@@ -27,12 +27,13 @@ def heartbeat_protocol():
 
 def recv_client_reqs():
 	global MY_OSD_ID
+
 	recv_client_reqs_socket = socket.socket()
 	print("client reqs socket successfully created")
 	recv_client_reqs_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
 	# reserve a port on your computer
-	port = 1207#READ_WRITE_PORT
+	port = READ_WRITE_PORT
 
 	# Next bind to the port
 	# we have not entered any ip in the ip field
