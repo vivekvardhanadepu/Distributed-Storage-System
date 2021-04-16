@@ -15,12 +15,15 @@ import shutil
 
 sys.path.insert(1, '../utils/')
 from transfer import _send_msg, _recv_msg
-from storage_gossip import heartbeat_protocol
+# from storage_gossip import heartbeat_protocol
 from info import READ_WRITE_PORT, WRITE_ACK_PORT, MONITOR_IPs
 
 MY_OSD_ID = 0
 FREESPACE = 0
 MONITOR_IP = MONITOR_IPs["primary"]
+
+def heartbeat_protocol():
+	pass
 
 def recv_client_reqs():
 	global MY_OSD_ID

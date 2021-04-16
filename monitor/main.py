@@ -15,7 +15,8 @@ import sys
 sys.path.insert(1, '../utils/')
 from transfer import _send_msg, _recv_msg, _wait_recv_msg
 from monitor_gossip import heartbeat_protocol
-from info import MDS_IPs, MDS_PORT, WRITE_ACK_PORT, OSD_INACTIVE_STATUS_PORT, CLIENT_REQ_PORT
+from info import MDS_IPs, MDS_PORT, WRITE_ACK_PORT, OSD_INACTIVE_STATUS_PORT, CLIENT_REQ_PORT, \
+                    RECV_PRIMARY_UPDATE
 
 hashtable = {}
 cluster_topology = {}
@@ -26,15 +27,41 @@ MDS_IP = MDS_IPs["primary"]
 # osd_list       = osd_ids list corresponding to pg_id,  if update_type == "hashtable"
 #                  osd_data,                             else
 def update_backup_monitor(update_type, pg_or_osd_ids_list, osd_list):
-    pass
     # if update_type == "hash_table":
     #     for i in range(len(pg_or_osd_ids_list)):
     #         hashtable[pg_or_osd_ids_list[i]] = osd_list[i]
     # else:
     #     for i in range(len(pg_or_osd_ids_list)):
     #         cluster_topology[pg_or_osd_ids_list[i]] = osd_list[i]
+    pass
 
 def recv_primary_update():
+    # recv_primary_update_socket = socket.socket()
+    # print ("primary update socket successfully created")
+    # recv_primary_update_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
+    # # reserve a port on your computer
+    # port = RECV_PRIMARY_UPDATE
+
+    # # Next bind to the port
+    # # we have not entered any ip in the ip field
+    # # instead we have inputted an empty string
+    # # this makes the server listen to requests
+    # # coming from other computers on the network
+    # recv_primary_update_socket.bind(('', port))
+    # print ("primary update socket bound to %s" %(port))
+
+    # # put the socket into listening mode
+    # recv_primary_update_socket.listen(5)
+    # print ("socket is listening")
+
+    # # a forever loop until we interrupt it or
+    # # an error occurs
+    # while True:
+
+    #     # Establish connection with osd
+    #     c, addr = recv_primary_update_socket.accept()
+    #     print ('Got connection from', addr)
     pass
 
 def recv_write_acks():
