@@ -16,46 +16,55 @@ def main():
     hashtable_file.write(hashtable_dump)
     hashtable_file.close()
 
+    MDS_flags = { # 0 - SUCCESS, 1 - ERROR
+                # "pg_id1":0,
+                # "pg_id2":0
+                 }
+    MDS_flags_dump = pickle.dumps(MDS_flags)
+    MDS_flags_file = open('MDS_flags', 'wb')
+    MDS_flags_file.write(MDS_flags_dump)
+    MDS_flags_file.close()
+
     # status = 0(ALIVE), 1(DOWN), 2(OUT)
     cluster_topology = {
                         1:
                         {
                             "ip":OSD_IPs[1],
-                            "port":READ_WRITE_PORT,
+                            "port":1207,#READ_WRITE_PORT,
                             "free_space":1000,
                             "status":0,
                             "friends_update":False,            
-                            "friends":{}
+                            "friends":set()
                         },
 
                         2:
                         {
                             "ip":OSD_IPs[2],
-                            "port":READ_WRITE_PORT,
+                            "port":1208,#READ_WRITE_PORT,
                             "free_space":1000,
                             "status":0,
                             "friends_update":False,
-                            "friends":{}
+                            "friends":set()
                         },
 
                         3:
                         {
                             "ip":OSD_IPs[3],
-                            "port":READ_WRITE_PORT,
+                            "port":1209,#READ_WRITE_PORT,
                             "free_space":1000,
                             "status":0,
                             "friends_update":False,
-                            "friends":{}
+                            "friends":set()
                         },
 
                         4:
                         {
                             "ip":OSD_IPs[4],
-                            "port":READ_WRITE_PORT,
+                            "port":1210,#READ_WRITE_PORT,
                             "free_space":1000,
                             "status":0,
                             "friends_update":False,
-                            "friends":{}
+                            "friends":set()
                         }
 
                         # "osd_id5":

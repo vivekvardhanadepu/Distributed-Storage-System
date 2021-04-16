@@ -33,10 +33,12 @@ class Client:
 		# self.latest_file_id = tree["last_file_id"]
 		self.processing = tree["processing"]
 		self.logged_in = True
-		self.gui()
 		self.start_update_handler = False # True if some file is processing for upload
 		self.update_interval = 2 # 2 sec interval for checking updates on file upload
 		# self.write_update_recv = False
+
+		self.gui()
+		
 
 	def update_handler(self):
 
@@ -45,7 +47,6 @@ class Client:
 		if self.start_update_handler == True:
 
 			while True:
-				time.sleep(self.update_interval)
 				if len(self.processing) == 0:
 					self.start_update_handler = False
 					break
@@ -81,17 +82,24 @@ class Client:
 
 						for filename in file_written: #populate listbox again
 							self.listbox.insert(END, filename)
-						self.window.mainloop()
+						tk.mainloop()
+						# self.window.mainloop()
 					elif response["status"] == "NO_UPD":
 						print(response["msg"])
+					time.sleep(self.update_interval)
+				
 
 				except Exception as e:
 					s.close()
 					print("Update failed")
 					print(e)
+					time.sleep(self.update_interval)
+				
 
 				finally:
 					print("Exiting login..")
+					time.sleep(self.update_interval)
+				
 
 
 	def upload(self, file_path):
@@ -100,6 +108,10 @@ class Client:
 			return 
 		
 		file_id, pg_list = self._chunker(file_path)
+
+		if file_id < 0:
+			return
+			
 		filename = os.path.basename(file_path)
 		## send to OSD using sockets ; ask IP to monitor
 		## using _write function
@@ -133,16 +145,19 @@ class Client:
 					print("DOWNLOAD failed")
 
 			res = -1
-
+		print(pg.pg_id)
+		print(len(pg.object_list))
 		for obj in pg.object_list:
+			print("pg received..")
 			if file_id == obj.file_id:
 				data = obj.data
+				print("writing file in disk..")
 				file = open("downloads/"+file_name, "wb")
 				file.write(data)
 				file.close()
 
 		# print(self.dir_tree)
-		self._print("[DOWNLOAD]", "Succesful")
+		self._popup("Update", "Download Succesful "+str(file_name))
 
 
 	def _read(self, pg_id):
@@ -155,7 +170,7 @@ class Client:
 		
 		s.connect((ip, port)) 
 		
-		msg = {"type":"READ", "PG_id":pg_id}
+		msg = {"type":"READ", "pg_id":pg_id}
 		# d_msg = pickle.dumps(msg)
 		
 		_send_msg(s, msg)
@@ -170,7 +185,7 @@ class Client:
 		# write on OSD
 		s = socket.socket()
 		s.connect(osd_addr)
-		data_msg = {"type":"READ", "PG_id":pg_id}
+		data_msg = {"type":"READ", "pg_id":pg_id}
 		_send_msg(s, data_msg)
 		
 		osd_response = _wait_recv_msg(s, 1024)
@@ -181,10 +196,12 @@ class Client:
 
 		if osd_response["pg_id"] == pg_id and osd_response["res"] == "SUCCESS":
 			s.close()
-			return 0, osd_response["PG"]
+			print("PG received from OSD writing on disk")
+			return 0, osd_response["pg"]
 		
 		else:
 			s.close()
+			print("Error - PG not received from OSD")
 			return -2, None
 	
 	def _write(self, pg, pg_data):
@@ -197,7 +214,7 @@ class Client:
 		
 		s.connect((ip, port)) 
 		
-		msg = {"type":"WRITE", "pg_id":pg.pg_id, "size":sys.getsizeof(pg)}
+		msg = {"type":"WRITE", "pg_id":pg.pg_id, "size":(sys.getsizeof(pg)/float(1<<20))}
 		# d_msg = pickle.dumps(msg)
 		
 		_send_msg(s, msg)
@@ -213,8 +230,9 @@ class Client:
 		osd_addr = osd_dict["addrs"][osd_dict["osd_ids"][0]]
 		s = socket.socket()
 		s.connect(osd_addr)
-		data_msg = {"type":"CLIENT_WRITE", "PG":pg, "client_id":self.username, "client_addr":"", "osd_dict":osd_dict}
+		data_msg = {"type":"CLIENT_WRITE", "pg":pg,"size":(sys.getsizeof(pg)/float(1<<20)), "client_id":self.username, "client_addr":"", "osd_dict":osd_dict}
 		_send_msg(s, data_msg)
+		print(len(pg.object_list))
 		
 		### Add server to receive response 
 		osd_response = _wait_recv_msg(s, 1024)
@@ -234,8 +252,14 @@ class Client:
 			return -2
 	
 	def _chunker(self, file_path):
-		file = open(file_path, 'rb')
-		data = file.read()
+		data = None
+		try:
+			file = open(file_path, 'rb')
+			data = file.read()
+			file.close()
+		except Exception as e:
+			print(e)
+			return -1, None
 		#size = sys.getsizeof(file)
 		# print(data)
 		file_ids = []

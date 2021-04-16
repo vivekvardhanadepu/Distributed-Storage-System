@@ -136,10 +136,10 @@ class MetadataServ:
 					res["status"] = "SUCCESS"
 
 				elif msg["update_type"] == "WRITE_SUCCESS":
-					username = msg["user"]
+					username = msg["update"]["user"]
 					tree = self._read_tree(username)
 
-					pg_id = msg["pg_id"]
+					pg_id = msg["update"]["pg_id"]
 					direc = tree["processing"][pg_id][0]
 					file_id = tree["processing"][pg_id][1]
 					filename = tree["processing"][pg_id][2]
@@ -150,9 +150,9 @@ class MetadataServ:
 					res["status"] = "SUCCESS"
 
 				elif msg["update_type"] == "UPDATE_PROCESSING":
-					username = msg["username"]
-					pg_written = msg["pg_written"]
-					pg_wait = msg["pg_wait"]
+					username = msg["update"]["username"]
+					pg_written = msg["update"]["pg_written"]
+					pg_wait = msg["update"]["pg_wait"]
 					
 					tree = self._read_tree(username)
 
@@ -177,7 +177,7 @@ class MetadataServ:
 
 	def update_handle(self, msg): # update will come from Monitor in cluster
 		res = {"status":"", "pg_id":msg["PG_ID"], "msg":""}
-		if msg["status"] == "SUCESS":
+		if msg["status"] == "SUCCESS":
 			username = msg["client_id"]
 			tree = self._read_tree(username)
 			pg_id = msg["PG_ID"]

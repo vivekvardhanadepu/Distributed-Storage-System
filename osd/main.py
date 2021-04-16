@@ -32,7 +32,7 @@ def recv_client_reqs():
 	recv_client_reqs_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
 	# reserve a port on your computer
-	port = READ_WRITE_PORT
+	port = 1207#READ_WRITE_PORT
 
 	# Next bind to the port
 	# we have not entered any ip in the ip field
@@ -59,7 +59,9 @@ def recv_client_reqs():
 		print(req)
 			
 		if(req["type"] == "CLIENT_WRITE"):
-			
+			res = {"status":"RECEIVED", "msg":"data received"}
+			_send_msg(c,res)
+
 			client_id = req["client_id"]
 			# client_addr = req["client_addr"]
 
@@ -93,12 +95,12 @@ def recv_client_reqs():
 			write_ack_socket = socket.socket()
 			print ("write forward socket successfully created")
 			
-			write_ack_socket.connect()
+			write_ack_socket.connect((MONITOR_IP, WRITE_ACK_PORT))
 			ack = {}
 			ack["client_id"] = client_id
 			# ack["client_addr"] = client_addr # addr = (ip, port)
 			ack["pg_id"] = pg.pg_id
-			ack["free_space"] = FREESPACE - sys.getsizeof(pg_dump)
+			ack["free_space"] = FREESPACE - req["size"]
 			ack["osd_id"] = MY_OSD_ID
 
 			_send_msg(write_ack_socket, ack)
@@ -123,7 +125,7 @@ def recv_client_reqs():
 			write_ack_socket = socket.socket()
 			print ("write forward socket successfully created")
 			
-			write_ack_socket.connect(MONITOR_IP, WRITE_ACK_PORT)
+			write_ack_socket.connect((MONITOR_IP, WRITE_ACK_PORT))
 			ack = {}
 			ack["client_id"] = client_id
 			# ack["client_addr"] = client_addr # addr = (ip, port)
@@ -135,8 +137,8 @@ def recv_client_reqs():
 
 			write_ack_socket.close()
 			
-		elif msg["type"] == "READ":
-			pg_id = msg["pg_id"]
+		elif req["type"] == "READ":
+			pg_id = req["pg_id"]
 			file = open("./data/"+pg_id, 'rb')
 
 			pg_b = file.read()
@@ -144,13 +146,14 @@ def recv_client_reqs():
 
 			file.close()
 			# print(pg)
+			print("sending pg to client "+str(pg_id))
 			msg = {"pg_id": pg.pg_id, "res":"SUCCESS", "pg":pg}
 
 			_send_msg(c, msg)
 
 		c.close()
 
-		print(msg)
+		# print(msg)
 
 	recv_client_reqs_socket.close()
 
@@ -162,7 +165,8 @@ def main(argc, argv):
 	global MY_OSD_ID, FREESPACE
 	MY_OSD_ID = int(argv[1])
 	_, _, FREESPACE = shutil.disk_usage('/')
-	FREESPACE = FREESPACE // float(1<<30)
+	FREESPACE = FREESPACE // float(1<<20)
+	print(FREESPACE)
 	# friends structure
 	# friends = {
 	# 			 "osd_id1" : {

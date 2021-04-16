@@ -19,8 +19,9 @@ from info import MDS_IPs, MDS_PORT, WRITE_ACK_PORT, OSD_INACTIVE_STATUS_PORT, CL
                     RECV_PRIMARY_UPDATE
 
 hashtable = {}
+MDS_flags = {}
 cluster_topology = {}
-MDS_IP = MDS_IPs["primary"]
+MDS_IP = MDS_IPs["primary"]["ip"]
 
 # pg_or_osd_list = pg_ids list,  if update_type == "hashtable"
 #                  osd_ids_list, else
@@ -65,7 +66,7 @@ def recv_primary_update():
     pass
 
 def recv_write_acks():
-    global hashtable, cluster_topology, MDS_IP
+    global hashtable, cluster_topology, MDS_IP, MDS_flags
 
     write_ack_socket = socket.socket()
     print ("write ack socket successfully created")
@@ -129,7 +130,7 @@ def recv_write_acks():
         # updating the backup        
         update_backup_monitor("hash_table", [pg_id], [hashtable[pg_id]])
         update_backup_monitor("cluster_topology", [osd[0] for osd in hashtable[pg_id]], \
-                            [cluster_topology[osd] for osd in hashtable])
+                            [cluster_topology[osd[0]] for osd in hashtable[pg_id]])
 
         hashtable_file = open('hashtable', 'wb')
         cluster_topology_file = open('cluster_topology', 'wb')
@@ -161,7 +162,7 @@ def recv_write_acks():
             MDS_update_socket = socket.socket()
             print ("MDS write ack socket successfully created")
 
-            MDS_update_socket.connect(MDS_IP, MDS_PORT)
+            MDS_update_socket.connect((MDS_IP, MDS_PORT))
 
             msg = {"type": "WRITE_RESPONSE", "PG_ID": pg_id, \
                    "status": "SUCCESS", "message": "write successful",\
@@ -169,7 +170,17 @@ def recv_write_acks():
 
             _send_msg(MDS_update_socket, msg)
 
-            MDS_ack = _wait_recv_msg(MDS_update_socket, msg)
+            MDS_ack = _wait_recv_msg(MDS_update_socket, 1024)
+            pg_id = MDS_ack["pg_id"]
+            if MDS_ack["status"] == "SUCCESS":
+                print("Write successful")
+                MDS_flags[pg_id] = 0
+            else:
+                print("Write error from MDS")
+                print(MDS_ack["msg"])
+                MDS_flags[pg_id] = 1
+                ## resend pgs in MDS_flags with flag = 1
+                ## start that loop here
 
             MDS_update_socket.close()
 
@@ -256,18 +267,19 @@ def recv_client_reqs():
         if(req["type"] == "WRITE"):
             pg_id = req["pg_id"]
             size = req["size"]
+            print(size)
             hashtable[pg_id] = []
 
             i = 0
             for osd_id in cluster_topology:
                 if cluster_topology[osd_id]["free_space"] > size:
-                    hashtable[pg_id].append((osd_id, 0))
+                    hashtable[pg_id].append([osd_id, 0])
                     i = i+1
 
                 if(i>2):
                     break
 
-            osd_ids = [hashtable[pg_id][i][0] for i in range(3)]
+            osd_ids = [osd[0] for osd in hashtable[pg_id]]
             
             addrs = {}
             for osd_id in osd_ids:
@@ -342,17 +354,23 @@ def main(argc, argv):
     #                     } 
     #                 }
 
-    global hashtable, cluster_topology
+    global hashtable, cluster_topology, MDS_flags
 
     hashtable_file = open('hashtable', 'rb')
     hashtable_dump = hashtable_file.read()
     hashtable = pickle.loads(hashtable_dump)
+
+
+    MDS_flags_file = open('MDS_flags', 'rb')
+    MDS_flags_dump = MDS_flags_file.read()
+    MDS_flags = pickle.loads(MDS_flags_dump)
 
     cluster_topology_file = open('cluster_topology', 'rb')
     cluster_topology_dump = cluster_topology_file.read()
     cluster_topology = pickle.loads(cluster_topology_dump)
 
     hashtable_file.close()
+    MDS_flags_file.close()
     cluster_topology_file.close()
 
     if isPrimary:
