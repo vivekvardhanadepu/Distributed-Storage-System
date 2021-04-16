@@ -6,16 +6,12 @@ from info import mds_ip, monitor_ip, storage_ip, num_objects_per_file, max_num_o
 
 from monitor_replicate import recovery
 
-def __init__():
-	self.live_osd = {"osd_id1":True, "osd_id2":True, "osd_id3":True, "osd_id4":True}
 
-
-
-def gossip(self, c, msg):
+def gossip(c, msg, live_osd):
 	node_ip = msg["ip"]
 	crash_osd_id = msg["osd_id"]
 
-	if self.live_osd[crash_osd_id] == False:
+	if live_osd[crash_osd_id] == False:
 		return 
 	
 	print(f"Need to start the recovery protocol for {node_ip} {crash_osd_id}")
@@ -28,16 +24,16 @@ def gossip(self, c, msg):
 	# hashtable_file.close()
 
 
-	self.live_osd[crash_osd_id] = False
+	live_osd[crash_osd_id] = False
 	rf = 3
 
-	hastable = recovery(crash_osd_id, hashtable, self.live_osd, rf)
+	hastable = recovery(crash_osd_id, hashtable, live_osd, rf)
 	print(hashtable)
 
 
 
 
-def heartbeat_protocol(soc):
+def heartbeat_protocol(soc, live_osd):
 	# Establish connection with client. 
 	c, addr = soc.accept()  
 	print(f"\nGot connection from {addr}")
@@ -59,7 +55,7 @@ def heartbeat_protocol(soc):
 		elif msg["type"] == "FAIL":
 			res = {"type": "ACK"}
 			_send_msg(c, res)
-			gossip(c, msg)
+			gossip(c, msg, live_osd)
 			
 		c.close()
 
@@ -71,6 +67,9 @@ def heartbeat_protocol(soc):
 
 
 if __name__ == "__main__":
+	# Make sure to maintain this 
+	live_osd = {"osd_id1":True, "osd_id2":True, "osd_id3":True, "osd_id4":True}
+
 	s = socket.socket()         
 	print ("Socket successfully created")
 	  
@@ -92,7 +91,7 @@ if __name__ == "__main__":
 	# an error occurs 
 	while True: 
 	  
-		heartbeat_protocol(s)
+		heartbeat_protocol(s, live_osd)
 		
 	s.close()
 	# Close the connection with the client 

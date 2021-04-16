@@ -1,5 +1,6 @@
 import socket
 import pickle
+import os
 from transfer import _send_msg, _recv_msg
 from info import mds_ip, monitor_ip, storage_ip, num_objects_per_file, max_num_objects_per_pg, MSG_SIZE, HEADERSIZE
 

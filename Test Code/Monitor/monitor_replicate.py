@@ -7,7 +7,7 @@ from info import mds_ip, monitor_ip, storage_ip, num_objects_per_file, max_num_o
 def send_replicate_request(pg_id, master_osd, clone_osd):
 	soc = socket.socket() 
 	soc.settimeout(5)        
-	print(f"Socket successfully created for replicating pg_id {pg_id} from master osd {master_osd} to clone osd {clone_osd}")
+	print(f"Socket successfully created for replicating {pg_id} from master {master_osd} to clone {clone_osd}")
 	  
 	# reserve a port on your computer in our 
 	ip_add = storage_ip[master_osd]["ip"] 
@@ -31,7 +31,7 @@ def send_replicate_request(pg_id, master_osd, clone_osd):
 			flag = 1
 
 	except : 
-		print("Didn't Connect! [Timeout] Primary Monitor is Down")
+		print("Didn't Connect! [Timeout] Master OSD is Down")
 
 	soc.close()
 	return flag
@@ -81,7 +81,7 @@ def recovery(crash_osd_id, hashtable, live_osd, replication_factor):
 	rf = replication_factor
 	
 	# Check the hashtable for pg_id dependency 
-	new_hastable = hashtable
+	new_hashtable = hashtable
 	for pg_id in hashtable.keys():
 		list_of_replicated_osds = hashtable[pg_id]
 		list_of_master = []
