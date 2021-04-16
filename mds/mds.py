@@ -246,7 +246,10 @@ class MetadataServ:
 		# if successful update on backup , now update on primary
 		if r==0:
 			for pg_id in pg_written:
-				file_written.append("/"+str(tree["processing"][pg_id][0])+"/"+str(tree["processing"][pg_id][2])) # filename in processing list
+				file_path = "/"+str(tree["processing"][pg_id][0])+"/"+str(tree["processing"][pg_id][2])
+				file_name = str(tree["processing"][pg_id][2])
+				file_id = tree["processing"][pg_id][1]
+				file_written.append((file_name, file_id, file_path)) # filename in processing list
 				tree["processing"].pop(pg_id)
 			for pg_id in pg_wait.keys():
 				tree["processing"][pg_id] = pg_wait[pg_id]

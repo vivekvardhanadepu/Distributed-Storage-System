@@ -32,7 +32,7 @@ def update_backup_monitor(update_type, pg_or_osd_ids_list, osd_list):
     print ("primary update socket successfully created")
 
     try:
-        primary_update_socket.connect((MDS_IPs["backup"], RECV_PRIMARY_UPDATE_PORT))
+        primary_update_socket.connect((MDS_IPs["backup"]["ip"], RECV_PRIMARY_UPDATE_PORT))
         msg = {"update_type": update_type, "pg_or_osd_ids_list": pg_or_osd_ids_list, \
                     "osd_list": osd_list}
         _send_msg(primary_update_socket, msg)
@@ -94,7 +94,8 @@ def recv_primary_update():
         cluster_topology_dump = pickle.dumps(cluster_topology)
         cluster_topology_file.write(cluster_topology_dump)
         cluster_topology_file.close()
-
+        msg = {"status":"SUCCESS"}
+        _send_msg(c, msg)
         # send the acknowledgement
         c.close()
 
@@ -330,7 +331,7 @@ def recv_client_reqs():
             osd_dict = {"osd_ids": osd_ids, "addrs": addrs}
             response = {"osd_dict": osd_dict, "status":"SUCCESS", "msg": "written succefully"}
             # updating the backup(only hash_table)
-            # update_backup_monitor("hash_table", [pg_id], [hashtable[pg_id]])
+            update_backup_monitor("hash_table", [pg_id], [hashtable[pg_id]])
 
             hashtable_file = open('hashtable', 'wb')
             hashtable_dump = pickle.dumps(hashtable)

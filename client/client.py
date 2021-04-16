@@ -44,72 +44,83 @@ class Client:
 
 		# if n == 0:
 		print("update handler started..")
-		if self.start_update_handler == True:
+		# if self.start_update_handler == True:
 
-			while True:
-				if len(self.processing) == 0:
-					self.start_update_handler = False
-					break
+		while True:
+			if len(self.processing) == 0:
+				self.start_update_handler = False
+				return
 
-				msg = {"type":"WRITE_QUERY", "username":self.username, "processing":self.processing}
+			msg = {"type":"WRITE_QUERY", "username":self.username, "processing":self.processing}
 
-				s = socket.socket()         
+			s = socket.socket()         
+			
+			ip = MDS_IPs["primary"]["ip"]
+			port = MDS_IPs["primary"]["port"]
+			# print(s.gethostname())      
+			s.bind(('', 9090))        
+			  
+			try:
+				s.connect((ip, port)) 
+
+				_send_msg(s, msg)
 				
-				ip = MDS_IPs["primary"]["ip"]
-				port = MDS_IPs["primary"]["port"]
-				# print(s.gethostname())      
-				s.bind(('', 9090))        
-				  
-				try:
-					s.connect((ip, port)) 
+				response = _wait_recv_msg(s, MSG_SIZE)
 
-					_send_msg(s, msg)
+				s.close()
+				if response["status"] == "SUCCESS": # here check response from mds
+					print(response["msg"])
+					file_written = response["file_written"]
 					
-					response = _wait_recv_msg(s, MSG_SIZE)
+					for file in file_written: #populate listbox again
+						filename = file[0]
+						file_id = file[1]
+						file_path = file[2]
+						self.file_id_map[filename] = file_id
+						self.listbox.insert(tk.END, file_path)
+						# listbox.insert(END, percent)
+						self.listbox.update_idletasks()
 
-					s.close()
-					if response["status"] == "SUCCESS": # here check response from mds
-						print(response["msg"])
-						file_written = response["file_written"]
-						
-						for filename in file_written: #populate listbox again
-							self.listbox.insert(END, filename)
-							# listbox.insert(END, percent)
-							self.listbox.update_idletasks()
+					tree = response["tree"]
+					self.dir_tree = tree["dir_tree"]
+					self.processing = tree["processing"]
+					print(self.processing)
+					if len(self.processing) == 0:
+						self.start_update_handler = False
+						print("Exiting update handler")
 
-						for file in file_written:
-							self._popup("Update", str(file)+" UPLOADED SUCCESSFULLY")
-						
-						tree = response["tree"]
-						self.dir_tree = tree["dir_tree"]
-						self.processing = tree["processing"]
-						# update on GUI
-
-						# self._update_canvas()
-
-						for filename in file_written: #populate listbox again
-							self.listbox.insert(END, filename)
-							# listbox.insert(END, percent)
-							self.listbox.update_idletasks()
-						
-						# tk.mainloop()
-						# self.window.mainloop()
-					elif response["status"] == "NO_UPD":
-						print(response["msg"])
-					time.sleep(self.update_interval)
-				
-
-				except Exception as e:
-					s.close()
-					print("Update (write) from MDS failed")
-					print(e)
-					time.sleep(self.update_interval)
-				
-
-				finally:
+					for file in file_written:
+						self._popup("Update", str(file[2])+" UPLOADED SUCCESSFULLY")
 					
-					time.sleep(self.update_interval)
+					
+					# return
+					# update on GUI
+
+					# self._update_gui()
+
+					# for filename in file_written: #populate listbox again
+					# 	self.listbox.insert(END, filename)
+					# 	# listbox.insert(END, percent)
+					# 	self.listbox.update_idletasks()
+					
+					# tk.mainloop()
+					# self.window.mainloop()
+				elif response["status"] == "NO_UPD":
+					print(response["msg"])
+				time.sleep(self.update_interval)
+			
+
+			except Exception as e:
+				s.close()
+				print("Update (write) from MDS failed")
+				print(e)
+				time.sleep(self.update_interval)
+			
+
+			finally:
 				
+				time.sleep(self.update_interval)
+			
 
 
 	def upload(self, file_path):
@@ -258,10 +269,10 @@ class Client:
 		if osd_response["status"] == "RECEIVED":
 			print("file sent to OSD")
 			self.processing[pg.pg_id] = pg_data
-			if self.start_update_handler == False:
-				self.start_update_handler = True
-				self.update_handler()
-				# threading.Thread(target=self.update_handler())
+			# if self.start_update_handler == False:
+			# 	self.start_update_handler = True
+				# self.update_handler()
+			threading.Thread(target=self.update_handler())
 			s.close()
 			return 0
 		
@@ -403,7 +414,7 @@ class Client:
 		
 
 		scrollbar.config( command = self.listbox.yview)
-
+		tk.mainloop()
 
 	def browseFiles(self):
 		filename = filedialog.askopenfilename(initialdir = "/",
@@ -563,7 +574,7 @@ def login():
 
 		print("[ERROR] login failed")
 		print(e)
-		_popup("Login Failed", response["msg"])
+		_popup("Login Failed", str(e))
 
 	finally:
 		print("Exiting login..")
