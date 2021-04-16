@@ -36,10 +36,10 @@ OSD -> replicas ... for monitoring on OSD
 """
 
 # Update all the stroage node IP everytime
-storage_1 = {"ip":"127.0.0.1", "port":7001}
-storage_2 = {"ip":"127.0.0.1", "port":7002}
-storage_3 = {"ip":"127.0.0.1", "port":7003}
-storage_4 = {"ip":"4.0.0.0", "port":7004}
+storage_1 = {"ip":"127.0.0.1", "port":10001}
+storage_2 = {"ip":"127.0.0.1", "port":10002}
+storage_3 = {"ip":"127.0.0.1", "port":10003}
+storage_4 = {"ip":"4.0.0.0", "port":10004}
 
 storage_ip = {"osd_id1":storage_1,"osd_id2":storage_2,"osd_id3":storage_3,"osd_id4":storage_4}
 
@@ -47,6 +47,6 @@ storage_ip = {"osd_id1":storage_1,"osd_id2":storage_2,"osd_id3":storage_3,"osd_i
 
 
 # Update all the monitor node IP
-monitor_1 = {"ip":"127.0.0.1", "port":5002}
-monitor_2 = {"ip":"127.0.0.1", "port":5002}
+monitor_1 = {"ip":"127.0.0.1", "port":4002}
+monitor_2 = {"ip":"127.0.0.1", "port":4002}
 monitor_ip = {"primary": monitor_1, "backup": monitor_2}

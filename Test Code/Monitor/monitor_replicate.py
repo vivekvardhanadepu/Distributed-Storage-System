@@ -1,5 +1,6 @@
 import socket
 import pickle
+import time
 from transfer import _send_msg, _recv_msg, _wait_recv_msg
 from info import mds_ip, monitor_ip, storage_ip, num_objects_per_file, max_num_objects_per_pg, MSG_SIZE, HEADERSIZE
 
@@ -12,26 +13,30 @@ def send_replicate_request(pg_id, master_osd, clone_osd):
 	# reserve a port on your computer in our 
 	ip_add = storage_ip[master_osd]["ip"] 
 	port =  storage_ip[master_osd]["port"] + 10    
-	  
+	
 	flag = -1
 	try :
 		soc.connect((ip_add, port))	
-		soc.timeout(None)
+		soc.settimeout(None)
 
-		print(f"Connecting with osd {osd_id}...")
+		print(f"Connecting with {master_osd} on port {port}...")
 		
-		res = {"type": "REPLICATE", "pg_id" : pg_id, "osd" : osd_id}
+		res = {"type": "REPLICATE", "pg_id" : pg_id, "osd_id" : clone_osd}
 		_send_msg(soc, res)
 		print("Message send for replication ")
+
+		# time.sleep(5)
 		
-		msg = _wait_recv_msg(c, MSG_SIZE)
+		msg = _wait_recv_msg(soc, MSG_SIZE)
+		print(msg)
 		if msg == None:
 			flag = 0
 		elif msg["type"] == "ACK": 
 			flag = 1
 
-	except : 
-		print("Didn't Connect! [Timeout] Master OSD is Down")
+	except Exception as e: 
+		print(e)
+		print(f"Didn't Connect! [Timeout] master {master_osd} is down,  port {port}")
 
 	soc.close()
 	return flag
@@ -55,10 +60,12 @@ def replicate(pg_id, osd_id_master_list, osd_id_clone_dict):
 					add_entry.append([clone, True])
 					break
 				elif ret == -1:
+					print("may try send_replicate_request again or continue to next master")
 					# may try send_replicate_request again
 					# or continue to next master
 					continue
 				elif ret == 0:
+					print("eans master osd server break before sending the ack")
 					# means master osd server break before sending the ack
 					continue
 				else:

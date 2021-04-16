@@ -9,7 +9,7 @@ def replicate_pg(soc):
 	# This will be always true loop that will run in parallel
 
 	c, addr = soc.accept() 
-	print ('Got connection from', addr )
+	print (f"Got connection from {addr} to do the replication")
 
 	n = os.fork()
 
@@ -19,6 +19,8 @@ def replicate_pg(soc):
 
 		if msg == None:
 			print(f"Didn't receive data! [Timeout] {addr}")
+			msg = {"type":"SEND AGAIN"}
+			_send_msg(c, msg)
 
 		elif msg["type"] == "REPLICATE":		
 			# Can do one thing here
@@ -39,17 +41,19 @@ def replicate_pg(soc):
 			ip_add = storage_ip[osd_id]["ip"]
 			port = storage_ip[osd_id]["port"]
 
-			new_soc.connect((ip_add, port))
-			print(f"Connection made with {ip_add} on {port}")
+			try :
+				new_soc.connect((ip_add, port))
+				print(f"Connection made with {ip_add} on {port}")
 
-			msg = {"type":"SAVE", "pg_id":pg_id, "pg": pg}
-			_send_msg(new_soc, msg)
-			print("Msg send to SAVE the data")
+				msg = {"type":"SAVE", "pg_id":pg_id, "pg": pg}
+				_send_msg(new_soc, msg)
+				print("Msg send to SAVE the data")
 
-			time.sleep(3)
+				msg = _wait_recv_msg(new_soc, MSG_SIZE)
+				print("Msg received !")
 
-			msg = _recv_msg(new_soc, MSG_SIZE)
-			print("Msg received !")
+			except Exception as e:
+				print(e)
 
 			if msg == None:
 				res = {"type": "REPLICATION FAIL"}
