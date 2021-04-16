@@ -47,7 +47,7 @@ HEARTBEAT_PORT = 1213
 
 
 # MONITOR
-MONITORS = {"primary": "10.0.2.3", "backup": "1.2.3.4"}
+MONITOR_IPs = {"primary": "10.0.2.3", "backup": "1.2.3.4"}
 
 CLIENT_REQ_PORT = 1217
 WRITE_ACK_PORT = 1223

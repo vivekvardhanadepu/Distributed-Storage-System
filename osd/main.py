@@ -11,45 +11,49 @@ import socket
 import pickle
 import sys
 import threading
+import shutils
+
 sys.path.insert('../utils/')
 from transfer import _send_msg, _recv_msg
 from storage_gossip import heartbeat_protocol
+from info import READ_WRITE_PORT, WRITE_ACK_PORT, MONITOR_IPs
 
-my_osd_id = 0
-freespace = 
+MY_OSD_ID = 0
+FREESPACE = 0
+MONITOR_IP = MONITOR_IPs["primary"]
 
 def recv_client_reqs():
-	global my_osd_id
-	s = socket.socket()
-    print ("write ack socket successfully created")
+	global MY_OSD_ID
+	recv_client_reqs_socket = socket.socket()
+	print("write ack socket successfully created")
+	recv_client_reqs_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
-    # reserve a port on your computer in our
-    # case it is 1234 but it can be anything
-    port = 1250
+	# reserve a port on your computer
+	port = READ_WRITE_PORT
 
-    # Next bind to the port
-    # we have not entered any ip in the ip field
-    # instead we have inputted an empty string
-    # this makes the server listen to requests
-    # coming from other computers on the network
-    s.bind(('', port))
-    print ("write ack socket bound to %s" %(port))
+	# Next bind to the port
+	# we have not entered any ip in the ip field
+	# instead we have inputted an empty string
+	# this makes the server listen to requests
+	# coming from other computers on the network
+	recv_client_reqs_socket.bind(('', port))
+	print ("write ack socket bound to %s" %(port))
 
-    # put the socket into listening mode
-    s.listen(5)
-    print ("socket is listening")
+	# put the socket into listening mode
+	recv_client_reqs_socket.listen(5)
+	print ("socket is listening")
 
-    # a forever loop until we interrupt it or
-    # an error occurs
-    while True:
+	# a forever loop until we interrupt it or
+	# an error occurs
+	while True:
 
-        # Establish connection with client.
-        c, addr = s.accept()
-        print ('Got connection from', addr)
+		# Establish connection with client.
+		c, addr = recv_client_reqs_socket.accept()
+		print ('Got connection from', addr)
 
-        # recv the acknowledgement
-        req = _recv_msg(c, 1024)
-        print(req)
+		# recv the acknowledgement
+		req = _recv_msg(c, 1024)
+		print(req)
 			
 		if(req["type"] == "CLIENT_WRITE"):
 			
@@ -59,7 +63,7 @@ def recv_client_reqs():
 			osd_dict = req["osd_dict"]
 
 			for osd_id in osd_dict["osd_ids"]:
-				if osd_id == my_osd_id:
+				if osd_id == MY_OSD_ID:
 					continue
 
 				# sending write update to client
@@ -86,13 +90,13 @@ def recv_client_reqs():
 			write_ack_socket = socket.socket()
 			print ("write forward socket successfully created")
 			
-			write_ack_socket.connect(monitor_addr)
+			write_ack_socket.connect()
 			ack = {}
 			ack["client_id"] = client_id
 			ack["client_addr"] = client_addr # addr = (ip, port)
 			ack["pg_id"] = pg.pg_id
-			ack["free_space"] = freespace - sys.getsizeof(pg_dump)
-			ack["osd_id"] = my_osd_id
+			ack["free_space"] = FREESPACE - sys.getsizeof(pg_dump)
+			ack["osd_id"] = MY_OSD_ID
 
 			_send_msg(write_ack_socket, ack)
 
@@ -116,13 +120,13 @@ def recv_client_reqs():
 			write_ack_socket = socket.socket()
 			print ("write forward socket successfully created")
 			
-			write_ack_socket.connect(monitor_addr)
+			write_ack_socket.connect(MONITOR_IP, WRITE_ACK_PORT)
 			ack = {}
 			ack["client_id"] = client_id
 			ack["client_addr"] = client_addr # addr = (ip, port)
 			ack["pg_id"] = pg.pg_id
-			ack["free_space"] = freespace - sys.getsizeof(pg_dump)
-			ack["osd_id"] = my_osd_id
+			ack["free_space"] = FREESPACE - sys.getsizeof(pg_dump)
+			ack["osd_id"] = MY_OSD_ID
 
 			_send_msg(write_ack_socket, ack)
 
@@ -145,24 +149,26 @@ def recv_client_reqs():
 
 		print(msg)
 
-	s.close()
+	recv_client_reqs_socket.close()
 
 def main(argc, argv):
 	if argc < 2:
-		print("error: python3 <filename> <osd_id>")
+		print("usage: python3 osd.py <osd_id>")
 
-	global osd_id
-	my_osd_id = argv[1]
+	global MY_OSD_ID, FREESPACE
+	MY_OSD_ID = argv[1]
+	_, _, FREESPACE = shutil.disk_usage('/')
+	FREESPACE = FREESPACE // float(1<<30)
 
 	# friends structure
 	# friends = {
 	# 			 "osd_id1" : {
 	# 							"addr" : (ip, port),
-							  	# "status" : 0
+								# "status" : 0
 							#  }
 	# 			 "osd_id2" : {
 	# 							"addr" : (ip, port),
-							  	# "status" : 0
+								# "status" : 0
 							#  }
 	# 			}
 
@@ -172,7 +178,7 @@ def main(argc, argv):
 	#						  send objects in case of read
 	# heartbeat_thread		: runs the heartbeat protocol
 	client_reqs_thread = threading.Thread(target=recv_client_reqs)
-    heartbeat_thread = threading.Thread(target=heartbeat_protocol)
+	heartbeat_thread = threading.Thread(target=heartbeat_protocol)
 	
 if __name__ == '__main__':
 	main(len(sys.argv), sys.argv)
