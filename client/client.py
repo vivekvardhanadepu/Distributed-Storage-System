@@ -100,7 +100,7 @@ class Client:
 			return 
 		
 		file_id, pg_list = self._chunker(file_path)
-		file_name = os.path.basename(file_path)
+		filename = os.path.basename(file_path)
 		## send to OSD using sockets ; ask IP to monitor
 		## using _write function
 		pg_data = [self.curr_dir, file_id, filename, 0]
@@ -197,13 +197,13 @@ class Client:
 		
 		s.connect((ip, port)) 
 		
-		msg = {"type":"WRITE", "PG_id":pg.pg_id, "size":size(pg)}
+		msg = {"type":"WRITE", "pg_id":pg.pg_id, "size":sys.getsizeof(pg)}
 		# d_msg = pickle.dumps(msg)
 		
 		_send_msg(s, msg)
 		#s.send(d_msg)
-		osd_dict = _recv_msg(s, MSG_SIZE)
-		
+		osd_dict = _wait_recv_msg(s, MSG_SIZE)
+		print(osd_dict)
 		# osd_dict = response["osd_dict"]
 		
 		# print(osd_ips)
@@ -350,7 +350,7 @@ class Client:
 
 		self.download(self.file_id_map[file_name])
 
-	def upload_file():
+	def upload_file(self):
 		filename = self.file_entry.get()
 		self.upload(filename)
 

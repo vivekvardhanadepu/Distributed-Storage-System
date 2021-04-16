@@ -18,7 +18,7 @@ def main():
 
     # status = 0(ALIVE), 1(DOWN), 2(OUT)
     cluster_topology = {
-                        "osd_id1":
+                        1:
                         {
                             "ip":OSD_IPs[1],
                             "port":READ_WRITE_PORT,
@@ -28,7 +28,7 @@ def main():
                             "friends":{}
                         },
 
-                        "osd_id2":
+                        2:
                         {
                             "ip":OSD_IPs[2],
                             "port":READ_WRITE_PORT,
@@ -38,7 +38,7 @@ def main():
                             "friends":{}
                         },
 
-                        "osd_id3":
+                        3:
                         {
                             "ip":OSD_IPs[3],
                             "port":READ_WRITE_PORT,
@@ -48,7 +48,7 @@ def main():
                             "friends":{}
                         },
 
-                        "osd_id4":
+                        4:
                         {
                             "ip":OSD_IPs[4],
                             "port":READ_WRITE_PORT,
