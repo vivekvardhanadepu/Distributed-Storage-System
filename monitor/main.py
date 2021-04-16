@@ -12,14 +12,30 @@ import socket
 import pickle
 import sys
 
-sys.path.insert('../utils/')
-from transfer import _send_msg, _recv_msg
-from monitor.monitor_gossip import heartbeat_protocol
+sys.path.insert(1, '../utils/')
+from transfer import _send_msg, _recv_msg, _wait_recv_msg
+from monitor_gossip import heartbeat_protocol
 from info import MDS_IPs, MDS_PORT, WRITE_ACK_PORT, OSD_INACTIVE_STATUS_PORT, CLIENT_REQ_PORT
 
 hashtable = {}
 cluster_topology = {}
 MDS_IP = MDS_IPs["primary"]
+
+# pg_or_osd_list = pg_ids list,  if update_type == "hashtable"
+#                  osd_ids_list, else
+# osd_list       = osd_ids list corresponding to pg_id,  if update_type == "hashtable"
+#                  osd_data,                             else
+def update_backup_monitor(update_type, pg_or_osd_ids_list, osd_list):
+    pass
+    # if update_type == "hash_table":
+    #     for i in range(len(pg_or_osd_ids_list)):
+    #         hashtable[pg_or_osd_ids_list[i]] = osd_list[i]
+    # else:
+    #     for i in range(len(pg_or_osd_ids_list)):
+    #         cluster_topology[pg_or_osd_ids_list[i]] = osd_list[i]
+
+def recv_primary_update():
+    pass
 
 def recv_write_acks():
     global hashtable, cluster_topology, MDS_IP
@@ -28,8 +44,7 @@ def recv_write_acks():
     print ("write ack socket successfully created")
     write_ack_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
-    # reserve a port on your computer in our
-    # case it is 1234 but it can be anything
+    # reserve a port on your computer
     port = WRITE_ACK_PORT
 
     # Next bind to the port
@@ -58,7 +73,7 @@ def recv_write_acks():
 
         # extracting the written pd_id, free_space, osd_id of that osd
         client_id = ack["client_id"]
-        client_addr = ack["client_addr"]    # addr = (ip, port)
+        # client_addr = ack["client_addr"]    # addr = (ip, port)
         pg_id = ack["pg_id"]
         free_space = ack["free_space"]
         osd_id = ack["osd_id"]
@@ -127,6 +142,8 @@ def recv_write_acks():
 
             _send_msg(MDS_update_socket, msg)
 
+            MDS_ack = _wait_recv_msg(MDS_update_socket, msg)
+
             MDS_update_socket.close()
 
         error = ""
@@ -145,8 +162,7 @@ def recv_inactive_osd():
     print ("inactive osd listener socket successfully created")
     recv_inactive_osd_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
-    # reserve a port on your computer in our
-    # case it is 1235 but it can be anything
+    # reserve a port on your computer
     port = OSD_INACTIVE_STATUS_PORT
 
     # Next bind to the port
@@ -166,7 +182,7 @@ def recv_inactive_osd():
     while True:
 
         # Establish connection with client.
-        c, addr = recv_inactive_osd.accept()
+        c, addr = recv_inactive_osd_socket.accept()
         print ('Got connection from', addr)
 
         # recv the inactive osd
@@ -254,7 +270,13 @@ def recv_client_reqs():
     recv_client_reqs_socket.close()
             
 
-def main():
+def main(argc, argv):
+    if argc < 2:
+        print('usage: python3 main.py <monitor_type>') # monitor_type = "primary" or "backup"
+        exit(-1)
+
+    isPrimary = argv[1] == "primary"
+
     ### hashtable and cluster topology structure
 
     ## write_status : 0(NOT WRITTEN), 1(WRITTEN)
@@ -306,26 +328,28 @@ def main():
     hashtable_file.close()
     cluster_topology_file.close()
 
+    if isPrimary:
+        ## THREADS
+        # write_acks_thread             : receives write acks from osds
+        # client_reqs_thread            : receives client reqs from the client and
+        #                                 sends back the osds' addresses
+        # osd_inactive_status_thread    : receives the osd_ids which are inactive
 
-    ## THREADS
-    # write_acks_thread             : receives write acks from osds
-    # client_reqs_thread            : receives client reqs from the client and
-    #                                 sends back the osds' addresses
-    # osd_inactive_status_thread    : receives the osd_ids which are inactive
+        write_acks_thread = threading.Thread(target=recv_write_acks)
+        client_reqs_thread = threading.Thread(target=recv_client_reqs)
+        osd_inactive_status_thread = threading.Thread(target=recv_inactive_osd)
 
-    write_acks_thread = threading.Thread(target=recv_write_acks)
-    client_reqs_thread = threading.Thread(target=recv_client_reqs)
-    osd_inactive_status_thread = threading.Thread(target=recv_inactive_osd)
+        # starting the threads
+        write_acks_thread.start()
+        client_reqs_thread.start()
+        osd_inactive_status_thread.start()
 
-    # starting the threads
-    write_acks_thread.start()
-    client_reqs_thread.start()
-    osd_inactive_status_thread.start()
-
-    # closing the threads
-    write_acks_thread.join()
-    client_reqs_thread.join()
-    osd_inactive_status_thread.join()
+        # closing the threads
+        write_acks_thread.join()
+        client_reqs_thread.join()
+        osd_inactive_status_thread.join()
+    else:
+        recv_primary_update()
 
 if __name__ == '__main__':
-	main()
+    main(len(sys.argv), sys.argv)

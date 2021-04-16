@@ -11,9 +11,9 @@ import socket
 import pickle
 import sys
 import threading
-import shutils
+import shutil
 
-sys.path.insert('../utils/')
+sys.path.insert(1, '../utils/')
 from transfer import _send_msg, _recv_msg
 from storage_gossip import heartbeat_protocol
 from info import READ_WRITE_PORT, WRITE_ACK_PORT, MONITOR_IPs
@@ -25,7 +25,7 @@ MONITOR_IP = MONITOR_IPs["primary"]
 def recv_client_reqs():
 	global MY_OSD_ID
 	recv_client_reqs_socket = socket.socket()
-	print("write ack socket successfully created")
+	print("client reqs socket successfully created")
 	recv_client_reqs_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
 	# reserve a port on your computer
@@ -58,7 +58,7 @@ def recv_client_reqs():
 		if(req["type"] == "CLIENT_WRITE"):
 			
 			client_id = req["client_id"]
-			client_addr = req["client_addr"]
+			# client_addr = req["client_addr"]
 
 			osd_dict = req["osd_dict"]
 
@@ -93,7 +93,7 @@ def recv_client_reqs():
 			write_ack_socket.connect()
 			ack = {}
 			ack["client_id"] = client_id
-			ack["client_addr"] = client_addr # addr = (ip, port)
+			# ack["client_addr"] = client_addr # addr = (ip, port)
 			ack["pg_id"] = pg.pg_id
 			ack["free_space"] = FREESPACE - sys.getsizeof(pg_dump)
 			ack["osd_id"] = MY_OSD_ID
@@ -104,9 +104,9 @@ def recv_client_reqs():
 			
 			# _send_msg(c, [pg.pg_id, "SUCCESS"])
 		
-		elif msg["type"] == "OSD_WRITE":
+		elif req["type"] == "OSD_WRITE":
 			client_id = req["client_id"]
-			client_addr = req["client_addr"]
+			# client_addr = req["client_addr"]
 
 			pg = req["pg"]
 			file = open("./data/"+pg.pg_id, 'wb')
@@ -123,7 +123,7 @@ def recv_client_reqs():
 			write_ack_socket.connect(MONITOR_IP, WRITE_ACK_PORT)
 			ack = {}
 			ack["client_id"] = client_id
-			ack["client_addr"] = client_addr # addr = (ip, port)
+			# ack["client_addr"] = client_addr # addr = (ip, port)
 			ack["pg_id"] = pg.pg_id
 			ack["free_space"] = FREESPACE - sys.getsizeof(pg_dump)
 			ack["osd_id"] = MY_OSD_ID
@@ -154,12 +154,12 @@ def recv_client_reqs():
 def main(argc, argv):
 	if argc < 2:
 		print("usage: python3 osd.py <osd_id>")
+		exit(-1)
 
 	global MY_OSD_ID, FREESPACE
-	MY_OSD_ID = argv[1]
+	MY_OSD_ID = int(argv[1])
 	_, _, FREESPACE = shutil.disk_usage('/')
 	FREESPACE = FREESPACE // float(1<<30)
-
 	# friends structure
 	# friends = {
 	# 			 "osd_id1" : {
@@ -179,6 +179,14 @@ def main(argc, argv):
 	# heartbeat_thread		: runs the heartbeat protocol
 	client_reqs_thread = threading.Thread(target=recv_client_reqs)
 	heartbeat_thread = threading.Thread(target=heartbeat_protocol)
+
+	# starting the threads
+	client_reqs_thread.start()
+	heartbeat_thread.start()
+
+	# closing the threads
+	client_reqs_thread.join()
+	heartbeat_thread.join()
 	
 if __name__ == '__main__':
 	main(len(sys.argv), sys.argv)
