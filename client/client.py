@@ -86,14 +86,12 @@ class Client:
 						# update on GUI
 
 						# self._update_canvas()
-<<<<<<< Updated upstream
+
 						for filename in file_written: #populate listbox again
 							self.listbox.insert(END, filename)
 							# listbox.insert(END, percent)
 							self.listbox.update_idletasks()
-=======
 						
->>>>>>> Stashed changes
 						# tk.mainloop()
 						# self.window.mainloop()
 					elif response["status"] == "NO_UPD":
@@ -376,8 +374,6 @@ class Client:
 
 		self.window.mainloop()
 	
-<<<<<<< Updated upstream
-=======
 	def _update_gui(self):
 		self.canvasG.delete('all')
 		scrollbar = tk.Scrollbar(self.canvasG)
@@ -407,7 +403,7 @@ class Client:
 		
 
 		scrollbar.config( command = self.listbox.yview)
->>>>>>> Stashed changes
+
 
 	def browseFiles(self):
 		filename = filedialog.askopenfilename(initialdir = "/",
