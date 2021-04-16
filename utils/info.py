@@ -44,7 +44,7 @@ OSD -> replicas ... for monitoring on OSD
 
 # OSD
 
-OSD_IPs = {1:"52.15.197.75", 2:"3.143.216.252", 3:"54.90.61.223", 4:"34.224.4.5"}
+OSD_IPs = {1:"52.15.197.75", 2:"3.143.216.252", 3:"54.157.187.18", 4:"34.224.4.5"}
 #OSD_IPs = {1:"127.0.0.1", 2:"127.0.0.1", 3:"127.0.0.1", 4:"34.224.4.5"}
 
 READ_WRITE_PORT = 1207
@@ -52,7 +52,7 @@ HEARTBEAT_PORT = 1213
 
 
 # MONITOR
-MONITOR_IPs = {"primary": "34.224.4.5", "backup": "54.90.61.223"}
+MONITOR_IPs = {"primary": "34.224.4.5", "backup": "54.157.187.18"}
 #MONITOR_IPs = {"primary": "127.0.0.1", "backup": "127.0.0.1"}
 
 CLIENT_REQ_PORT = 1217
