@@ -4,7 +4,7 @@ import threading
 import time
 import os
 from transfer import _send_msg, _recv_msg, _wait_recv_msg
-from info import mds_ip, monitor_ip, storage_ip, num_objects_per_file, max_num_objects_per_pg, MSG_SIZE, HEADERSIZE
+from info import MONITOR_IPs, OSD_IPs, HEARTBEAT_PORT, num_objects_per_file, max_num_objects_per_pg, MSG_SIZE, HEADERSIZE
 
 STORAGE_ID = 1
 
@@ -16,7 +16,7 @@ def report_monitor(node_ip, node_id):
 	soc.settimeout(5)
 	print ("Socket successfully created for Recovery: Primary")
 
-	monitor_1 = monitor_ip["primary"]
+	monitor_1 = MONITOR_IPs["primary"]
 	
 	try :
 		soc.connect((monitor_1["ip"], monitor_1["port"]))	
@@ -47,7 +47,7 @@ def report_monitor(node_ip, node_id):
 	print ("Socket successfully created for Recovery: Backup")
 	
 
-	monitor_2 = monitor_ip["backup"]
+	monitor_2 = MONITOR_IPs["backup"]
 
 	try : 
 		soc.connect((monitor_2["ip"], monitor_2["port"]))	
@@ -80,8 +80,8 @@ def recv_gossip():
 		i=0
 		for i in range(4):
 			if i+1 != STORAGE_ID:
-				node_ip =  storage_ip[i+1]["ip"]
-				port = storage_ip[i+1]["port"]
+				node_ip =  OSD_IPs[i+1]["ip"]
+				port = OSD_IPs[i+1]["port"]
 
 				soc = socket.socket()
 				soc.settimeout(5)
@@ -121,7 +121,7 @@ def send_heartbeat():
 
 	s = socket.socket()         
 	print ("Socket successfully created for Heartbeat")
-	port =  storage_ip[STORAGE_ID]["port"] 
+	port =  HEARTBEAT_PORT
 	s.bind(('', port))         
 	print ("Socket binded to %s" %(port)) 
 	  

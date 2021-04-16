@@ -2,7 +2,7 @@ import socket
 import pickle
 import os
 from transfer import _send_msg, _recv_msg, _wait_recv_msg
-from info import mds_ip, monitor_ip, storage_ip, num_objects_per_file, max_num_objects_per_pg, MSG_SIZE, HEADERSIZE
+from info import HEARTBEAT_PORT, num_objects_per_file, max_num_objects_per_pg, MSG_SIZE, HEADERSIZE
 
 def __init__():
 
@@ -72,7 +72,7 @@ if __name__ == "__main__":
 	print ("Socket successfully created")
 	  
 	# reserve a port on your computer in our 
-	port =  monitor_ip["primary"]["port"]       
+	port = HEARTBEAT_PORT
 	  
 	# Next bind to the port 
 	# we have not typed any ip in the ip field 
