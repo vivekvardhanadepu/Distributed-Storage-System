@@ -96,6 +96,10 @@ class MetadataServ:
 			elif msg["type"] == "WRITE_QUERY":
 				res = self._client_query_handle(msg)
 				print(res["msg"])
+
+			elif msg["type"] == "RECOVERY":
+				res = self._recovery_handle()
+				print(res["msg"])
 			
 			try:
 				_send_msg(c, res)
@@ -164,6 +168,10 @@ class MetadataServ:
 					self._write_tree(username, tree)
 					res["status"] = "SUCCESS"
 
+			elif msg["type"] == "RECOVERY":
+				res = self._recovery_handle()
+				print(res["msg"])
+			
 			else:
 				res["status"] = "ERROR"
 				res["msg"] = "msg type not define !"
@@ -420,6 +428,18 @@ class MetadataServ:
 		file.write(obj_b)
 
 		file.close()
+
+	def _recovery_handle(self):
+		trees = []
+		for username in self.user_list.keys():
+			tree = self._read_tree(username)
+			trees.append(tree)
+
+		logged_in = self._read_logged_in()
+
+		res = {"trees":trees, "logged_in":logged_in, "status":"SUCCESS", "msg":"delivered data for recovery"}
+
+		return res
 
 
 if __name__ == "__main__":

@@ -72,6 +72,11 @@ class Client:
 						print(response["msg"])
 						file_written = response["file_written"]
 						
+						for filename in file_written: #populate listbox again
+							self.listbox.insert(END, filename)
+							# listbox.insert(END, percent)
+							self.listbox.update_idletasks()
+
 						for file in file_written:
 							self._popup("Update", str(file)+" UPLOADED SUCCESSFULLY")
 						
@@ -81,10 +86,14 @@ class Client:
 						# update on GUI
 
 						# self._update_canvas()
+<<<<<<< Updated upstream
 						for filename in file_written: #populate listbox again
 							self.listbox.insert(END, filename)
 							# listbox.insert(END, percent)
 							self.listbox.update_idletasks()
+=======
+						
+>>>>>>> Stashed changes
 						# tk.mainloop()
 						# self.window.mainloop()
 					elif response["status"] == "NO_UPD":
@@ -253,7 +262,8 @@ class Client:
 			self.processing[pg.pg_id] = pg_data
 			if self.start_update_handler == False:
 				self.start_update_handler = True
-				threading.Thread(target=self.update_handler())
+				self.update_handler()
+				# threading.Thread(target=self.update_handler())
 			s.close()
 			return 0
 		
@@ -366,6 +376,38 @@ class Client:
 
 		self.window.mainloop()
 	
+<<<<<<< Updated upstream
+=======
+	def _update_gui(self):
+		self.canvasG.delete('all')
+		scrollbar = tk.Scrollbar(self.canvasG)
+		# scrollbar.place(y=50)
+		scrollbar.pack( side = tk.RIGHT,
+				fill = tk.Y )
+		self.list_item = tk.StringVar()
+		# self.canvasG.configure(yscrollcommand=scrollbar.set)
+		self.listbox = tk.Listbox(self.canvasG, yscrollcommand = scrollbar.set, width=150, height=30,
+							listvariable=self.list_item, selectmode = 'browse' )
+		# mylist.place(x = 60, y=50)
+		file_list = []
+		self.file_id_map = {}
+		for d in self.dir_tree.keys():
+			for file_id in self.dir_tree[d].keys():
+				f_name = self.dir_tree[d][file_id][0]
+				file_list.append("/"+str(d)+"/"+str(f_name))
+				self.file_id_map[f_name] = file_id
+
+		for file in file_list:
+			self.listbox.insert(tk.END, file)
+
+		# mylist.place(x = 60, y=50)#, side = "left", fill = "both")
+		self.listbox.pack()#side = tk.LEFT, fill = tk.BOTH )
+		self.listbox.bind("<MouseWheel>", self.scrolllistbox)
+		self.listbox.bind('<Double-1>', self.download_file)
+		
+
+		scrollbar.config( command = self.listbox.yview)
+>>>>>>> Stashed changes
 
 	def browseFiles(self):
 		filename = filedialog.askopenfilename(initialdir = "/",
