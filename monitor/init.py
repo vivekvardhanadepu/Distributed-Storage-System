@@ -1,4 +1,7 @@
 import pickle
+import sys
+sys.path.insert(1, '../utils/')
+from info import OSD_IPs, READ_WRITE_PORT
 
 def main():
     ## hashtable and cluster topology structure
@@ -17,9 +20,9 @@ def main():
     cluster_topology = {
                         "osd_id1":
                         {
-                            "ip":'blah',
-                            "port":1020,
-                            "free_space":100,
+                            "ip":OSD_IPs[1],
+                            "port":READ_WRITE_PORT,
+                            "free_space":1000,
                             "status":0,
                             "friends_update":False,            
                             "friends":{}
@@ -27,9 +30,9 @@ def main():
 
                         "osd_id2":
                         {
-                            "ip":'blah',
-                            "port":1211,
-                            "free_space":100,
+                            "ip":OSD_IPs[2],
+                            "port":READ_WRITE_PORT,
+                            "free_space":1000,
                             "status":0,
                             "friends_update":False,
                             "friends":{}
@@ -37,9 +40,9 @@ def main():
 
                         "osd_id3":
                         {
-                            "ip":'blah',
-                            "port":1211,
-                            "free_space":100,
+                            "ip":OSD_IPs[3],
+                            "port":READ_WRITE_PORT,
+                            "free_space":1000,
                             "status":0,
                             "friends_update":False,
                             "friends":{}
@@ -47,9 +50,9 @@ def main():
 
                         "osd_id4":
                         {
-                            "ip":'blah',
-                            "port":1211,
-                            "free_space":100,
+                            "ip":OSD_IPs[4],
+                            "port":READ_WRITE_PORT,
+                            "free_space":1000,
                             "status":0,
                             "friends_update":False,
                             "friends":{}
