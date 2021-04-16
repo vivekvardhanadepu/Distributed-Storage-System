@@ -1,14 +1,16 @@
 import socket
 import pickle
-import multiprocessing
+import threading
 import time
-from transfer import _send_msg, _recv_msg
+import os
+from transfer import _send_msg, _recv_msg, _wait_recv_msg
 from info import mds_ip, monitor_ip, storage_ip, num_objects_per_file, max_num_objects_per_pg, MSG_SIZE, HEADERSIZE
 
 STORAGE_ID = 1
 
 
-def recovery(node_ip, node_id):
+def report_monitor(node_ip, node_id):
+	flag = 0
 	#Will call monitor to state about the down node
 	soc = socket.socket()
 	soc.settimeout(5)
@@ -18,21 +20,24 @@ def recovery(node_ip, node_id):
 	
 	try :
 		soc.connect((monitor_1["ip"], monitor_1["port"]))	
-		soc.timeout(None)
+		# soc.timeout(None)
 
 		print(f"Connecting Primary monitor...")
 		
 		res = {"type": "FAIL", "ip" : node_ip, "id" : node_id}
 		_send_msg(soc, res)
-		time.sleep(3)
 		
-		msg = _recv_msg(c, MSG_SIZE)
+		msg = _wait_recv_msg(soc, MSG_SIZE)
+		print(msg)
 		if msg == None:
 			pass
 		elif msg["type"] == "ACK": 
+
+			soc.close()
 			return
 
-	except : 
+	except Exception as e: 
+		print(e)
 		print("Didn't Connect! [Timeout] Primary Monitor is Down")
 
 	soc.close()
@@ -51,9 +56,9 @@ def recovery(node_ip, node_id):
 	
 		res = {"type": "FAIL", "ip" : node_ip, "id" : node_id}
 		_send_msg(soc, res)
-		time.sleep(3)
 
-		msg = _recv_msg(c, MSG_SIZE)
+		msg = _wait_recv_msg(soc, MSG_SIZE)
+		print(msg)
 		if msg == None:
 			pass
 		elif msg["type"] == "ACK": 
@@ -66,7 +71,7 @@ def recovery(node_ip, node_id):
 
 
 
-def gossip():
+def recv_gossip():
 
 	while True:
 		time.sleep(10)
@@ -80,35 +85,37 @@ def gossip():
 
 				soc = socket.socket()
 				soc.settimeout(5)
-				print ("Socket successfully created for Gossip")
+				print(f"\n\nSocket successfully created for Gossip with osd {i+1}")
 			
 				try :
 					soc.connect((node_ip, port))
 					soc.settimeout(None)
 
-					print(f"Connecting {node_ip} storage node number {i+1}")
+					print(f"Connecting {node_ip} storage node number {i+1} port {port}")
 					
 					msg = {"type": "ALIVE"}
 					_send_msg(soc, msg)
-					time.sleep(3)
 
-					rec = _recv_msg(c, MSG_SIZE)
+					rec = _wait_recv_msg(soc, MSG_SIZE)
+					print(msg)
 					if rec == None: 
 						print(f"Didn't receive data to Storage {i+1} ip {node_ip}! [Timeout] ")
-						recovery(node_ip, i+1)
+						report_monitor(node_ip, i+1)
 
-					elif rec["type"] != "ALIVE": 
-						recovery(node_ip, i+1)
+					elif rec["type"] != "ACK": 
+						report_monitor(node_ip, i+1)
 					
 				except :	
 					print(f"Didn't Connect to Storage {i+1} ip {node_ip}! [Timeout]")
-					recovery(node_ip, i+1)
+					report_monitor(node_ip, i+1)
 			
 				soc.close()	
 
+			time.sleep(3)
 
 
-def heartbeat_protocol():
+
+def send_heartbeat():
 	#This will check for incoming messages 
 	#from other nodes and reply 
 
@@ -125,25 +132,31 @@ def heartbeat_protocol():
 	while True:
 		# Establish connection with client. 
 		c, addr = s.accept()     
-		print ('Got connection from', addr )
+		print(f"\nGot connection from {addr}")
 
-		
-		msg = _recv_msg(c, MSG_SIZE)	
+		n = os.fork()
+		if n == 0:
+			print(F"Inside child process {os.getpid()}")
+			msg = _recv_msg(c, MSG_SIZE)	
+			print(msg)
 
-		if msg == None:
-			print(f"Didn't receive data from ip {addr}! [Timeout] ")
-			recovery(addr, None)
+			if msg == None:
+				print(f"Didn't receive data from ip {addr}! [Timeout] ")
+				report_monitor(addr, None)
 
-		elif msg["type"] != "ALIVE": 
-			res = {"type": "ACK"}
-			_send_msg(c, res)
+			elif msg["type"] == "ALIVE": 
+				res = {"type": "ACK"}
+				_send_msg(c, res)
 
-		c.close()
+			c.close()
+
+			print(f"Exiting from pid {os.getpid()} ..\n\n")
+			os._exit(1)
 
 
 if __name__ == "__main__":
 
-	p1 = multiprocessing.Process(name='p1', target=heartbeat_protocol)
-	p2 = multiprocessing.Process(name='p2', target=gossip)
+	p1 = threading.Thread(target=send_heartbeat)
+	p2 = threading.Thread(target=recv_gossip)
 	p1.start()
 	p2.start()

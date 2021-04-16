@@ -1,6 +1,7 @@
 import socket
 import pickle
-from transfer import _send_msg, _recv_msg
+import os
+from transfer import _send_msg, _recv_msg, _wait_recv_msg
 from info import mds_ip, monitor_ip, storage_ip, num_objects_per_file, max_num_objects_per_pg, MSG_SIZE, HEADERSIZE
 
 def __init__():
@@ -19,8 +20,8 @@ def gossip(c, msg):
 
 	i = 0
 	for node in storage_ip:
-		if node["ip"] == node_ip:
-			self.storage_node[i] = False
+		if storage_ip[node] == node_ip:
+			# self.storage_node[i] = False
 
 			print(f"Need to start the recovery protocol for {node_ip} storage node number {i+1}")
 			recovery()
@@ -35,26 +36,34 @@ def gossip(c, msg):
 
 def heartbeat_protocol(soc):
 	# Establish connection with client. 
-	c, addr = s.accept()     
-	c.settimeout(5)
-	print ('Got connection from', addr )
+	c, addr = soc.accept()  
+	print(f"\nGot connection from {addr}")
 	
-	msg = _recv_msg(c, MSG_SIZE)
-	print(msg)
+	n = os.fork()
 
-	if msg == None:
-		print(f"Didn't receive data! [Timeout] {addr}")
+	if n == 0:
+		print(F"Inside child process {os.getpid()}")
+		msg = _recv_msg(c, MSG_SIZE)
+		print(msg)
 
-	elif msg["type"] == "ALIVE":
-		res = {"type": "ACK"}
-		_send_msg(c, res)
+		if msg == None:
+			print(f"Didn't receive data! [Timeout] {addr}")
 
-	elif msg["type"] == "FAIL":
-		res = {"type": "ACK"}
-		_send_msg(c, res)
-		gossip(c, msg)
-		
-	c.close()
+		elif msg["type"] == "ALIVE":
+			res = {"type": "ACK"}
+			_send_msg(c, res)
+
+		elif msg["type"] == "FAIL":
+			res = {"type": "ACK"}
+			_send_msg(c, res)
+			# gossip(c, msg)
+			
+		c.close()
+
+		print(f"Exiting from pid {os.getpid()} ..\n")
+		os._exit(1)
+
+	return
 
 
 
