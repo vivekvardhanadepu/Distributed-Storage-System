@@ -16,12 +16,13 @@ sys.path.insert(1, '../utils/')
 from transfer import _send_msg, _recv_msg, _wait_recv_msg
 # from monitor_gossip import heartbeat_protocol
 from info import MDS_IPs, MDS_PORT, WRITE_ACK_PORT, OSD_INACTIVE_STATUS_PORT, CLIENT_REQ_PORT, \
-                    RECV_PRIMARY_UPDATE_PORT, MSG_SIZE
+                    RECV_PRIMARY_UPDATE_PORT, MSG_SIZE, MONITOR_IPs
 
 # hashtable = {}
 MDS_flags = {}
 cluster_topology = {}
 MDS_IP = MDS_IPs["primary"]["ip"]
+isPrimary = True
 
 # pg_or_osd_list = pg_ids list,  if update_type == "hashtable"
 #                  osd_ids_list, else
@@ -32,7 +33,7 @@ def update_backup_monitor(update_type, pg_or_osd_ids_list, osd_list):
     print ("primary update socket successfully created")
 
     try:
-        primary_update_socket.connect((MDS_IPs["backup"]["ip"], RECV_PRIMARY_UPDATE_PORT))
+        primary_update_socket.connect((MONITOR_IPs["backup"], RECV_PRIMARY_UPDATE_PORT))
         msg = {"update_type": update_type, "pg_or_osd_ids_list": pg_or_osd_ids_list, \
                     "osd_list": osd_list}
         _send_msg(primary_update_socket, msg)
@@ -45,62 +46,6 @@ def update_backup_monitor(update_type, pg_or_osd_ids_list, osd_list):
     except Exception as e:
         print(e)
         primary_update_socket.close()
-
-def recv_primary_update():
-    recv_primary_update_socket = socket.socket()
-    print ("recv primary update socket successfully created")
-    recv_primary_update_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-
-    # reserve a port on your computer
-    port = RECV_PRIMARY_UPDATE_PORT
-
-    # Next bind to the port
-    # we have not entered any ip in the ip field
-    # instead we have inputted an empty string
-    # this makes the server listen to requests
-    # coming from other computers on the network
-    recv_primary_update_socket.bind(('', port))
-    print ("primary update socket bound to %s" %(port))
-
-    # put the socket into listening mode
-    recv_primary_update_socket.listen(5)
-    print ("primary update socket is listening")
-
-    # a forever loop until we interrupt it or
-    # an error occurs
-    while True:
-
-        # Establish connection with osd
-        c, addr = recv_primary_update_socket.accept()
-        print ('Got connection from', addr)
-
-        # recv the update
-        update = _recv_msg(c, 1024)
-        print(update)
-        # hashtable = _read
-
-        if update["update_type"] == "hash_table":
-            for i in range(len(update["pg_or_osd_ids_list"])):
-                hashtable[update["pg_or_osd_ids_list"][i]] = update["osd_list"][i]
-        else:
-            for i in range(len(update["pg_or_osd_ids_list"])):
-                cluster_topology[update["pg_or_osd_ids_list"][i]] = update["osd_list"][i]
-        
-        hashtable_file = open('hashtable', 'wb')
-        hashtable_dump = pickle.dumps(hashtable)
-        hashtable_file.write(hashtable_dump)
-        hashtable_file.close()
-
-        cluster_topology_file = open('cluster_topology', 'wb')
-        cluster_topology_dump = pickle.dumps(cluster_topology)
-        cluster_topology_file.write(cluster_topology_dump)
-        cluster_topology_file.close()
-        msg = {"status":"SUCCESS"}
-        _send_msg(c, msg)
-        # send the acknowledgement
-        c.close()
-
-    recv_primary_update_socket.close()
 
 def recv_write_acks():
     global hashtable, cluster_topology, MDS_IP, MDS_flags
@@ -164,10 +109,11 @@ def recv_write_acks():
 
         cluster_topology[osd_id]["free_space"] = free_space
 
-        # updating the backup        
-        update_backup_monitor("hash_table", [pg_id], [hashtable[pg_id]])
-        update_backup_monitor("cluster_topology", [osd[0] for osd in hashtable[pg_id]], \
-                            [cluster_topology[osd[0]] for osd in hashtable[pg_id]])
+        if isPrimary:
+            # updating the backup        
+            update_backup_monitor("hash_table", [pg_id], [hashtable[pg_id]])
+            update_backup_monitor("cluster_topology", [osd[0] for osd in hashtable[pg_id]], \
+                                [cluster_topology[osd[0]] for osd in hashtable[pg_id]])
 
         hashtable_file = open('hashtable', 'wb')
         cluster_topology_file = open('cluster_topology', 'wb')
@@ -331,8 +277,9 @@ def recv_client_reqs():
                 addrs[osd_id] = (cluster_topology[osd_id]["ip"], cluster_topology[osd_id]["port"])
             osd_dict = {"osd_ids": osd_ids, "addrs": addrs}
             response = {"osd_dict": osd_dict, "status":"SUCCESS", "msg": "written succefully"}
-            # updating the backup(only hash_table)
-            update_backup_monitor("hash_table", [pg_id], [hashtable[pg_id]])
+            if isPrimary:
+                # updating the backup(only hash_table)
+                update_backup_monitor("hash_table", [pg_id], [hashtable[pg_id]])
 
             hashtable_file = open('hashtable', 'wb')
             hashtable_dump = pickle.dumps(hashtable)
@@ -355,6 +302,8 @@ def recv_client_reqs():
             
 
 def main(argc, argv):
+    global isPrimary
+
     if argc < 2:
         print('usage: python3 main.py <monitor_type>') # monitor_type = "primary" or "backup"
         exit(-1)
@@ -399,7 +348,7 @@ def main(argc, argv):
     #                     } 
     #                 }
 
-    global hashtable, cluster_topology, MDS_flags
+    global hashtable, cluster_topology, MDS_flags, MDS_IP
 
     hashtable_file = open('hashtable', 'rb')
     hashtable_dump = hashtable_file.read()
@@ -418,28 +367,25 @@ def main(argc, argv):
     MDS_flags_file.close()
     cluster_topology_file.close()
 
-    if isPrimary:
-        ## THREADS
-        # write_acks_thread             : receives write acks from osds
-        # client_reqs_thread            : receives client reqs from the client and
-        #                                 sends back the osds' addresses
-        # osd_inactive_status_thread    : receives the osd_ids which are inactive
+    ## THREADS
+    # write_acks_thread             : receives write acks from osds
+    # client_reqs_thread            : receives client reqs from the client and
+    #                                 sends back the osds' addresses
+    # osd_inactive_status_thread    : receives the osd_ids which are inactive
 
-        write_acks_thread = threading.Thread(target=recv_write_acks)
-        client_reqs_thread = threading.Thread(target=recv_client_reqs)
-        osd_inactive_status_thread = threading.Thread(target=recv_inactive_osd)
+    write_acks_thread = threading.Thread(target=recv_write_acks)
+    client_reqs_thread = threading.Thread(target=recv_client_reqs)
+    osd_inactive_status_thread = threading.Thread(target=recv_inactive_osd)
 
-        # starting the threads
-        write_acks_thread.start()
-        client_reqs_thread.start()
-        osd_inactive_status_thread.start()
+    # starting the threads
+    write_acks_thread.start()
+    client_reqs_thread.start()
+    osd_inactive_status_thread.start()
 
-        # closing the threads
-        write_acks_thread.join()
-        client_reqs_thread.join()
-        osd_inactive_status_thread.join()
-    else:
-        recv_primary_update()
+    # closing the threads
+    write_acks_thread.join()
+    client_reqs_thread.join()
+    osd_inactive_status_thread.join()
 
 def _read_hash():
     hashtable_file = open('hashtable', 'rb')
