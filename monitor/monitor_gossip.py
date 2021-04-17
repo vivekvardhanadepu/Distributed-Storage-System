@@ -1,40 +1,42 @@
 import socket
 import pickle
 import os
+import sys
+
+from monitor_replicate import recovery
+
+sys.path.insert(1, '../utils/')
 from transfer import _send_msg, _recv_msg, _wait_recv_msg
-from info import HEARTBEAT_PORT, num_objects_per_file, max_num_objects_per_pg, MSG_SIZE, HEADERSIZE
-
-def __init__():
-
-	#This will help us to know if the storage is alive or not
-	for i in range(4):
-		self.storage_node[i] = True
+from info import mds_ip, monitor_ip, storage_ip, num_objects_per_file, max_num_objects_per_pg, MSG_SIZE, HEADERSIZE
 
 
-def recovery():
-	#Will start the recovery protocol
-	pass
-
-def gossip(c, msg):
+def gossip(c, msg, live_osd):
 	node_ip = msg["ip"]
+	crash_osd_id = msg["osd_id"]
 
-	i = 0
-	for node in storage_ip:
-		if storage_ip[node] == node_ip:
-			# self.storage_node[i] = False
+	if live_osd[crash_osd_id] == False:
+		return 
+	
+	print(f"Need to start the recovery protocol for {node_ip} {crash_osd_id}")
 
-			print(f"Need to start the recovery protocol for {node_ip} storage node number {i+1}")
-			recovery()
-
-			break
-
-		i += 1
-
-	res = {"type": "ACK"}
-	_send_msg(c, res)
+	hashtable = {"pg_id1":[("osd_id1", True), ("osd_id2", True), ("osd_id4", True)]}
+	# Use this in maincode
+	# hashtable_file = open('hashtable', 'rb')
+	# hashtable_dump = hashtable_file.read()
+	# hashtable = pickle.load(hashtable_dump)
+	# hashtable_file.close()
 
 
-def heartbeat_protocol(soc):
+	live_osd[crash_osd_id] = False
+	rf = 3
+
+	hastable = recovery(crash_osd_id, hashtable, live_osd, rf)
+	print(hashtable)
+
+
+
+
+def heartbeat_protocol(soc, live_osd):
 	# Establish connection with client. 
 	c, addr = soc.accept()  
 	print(f"\nGot connection from {addr}")
@@ -56,7 +58,7 @@ def heartbeat_protocol(soc):
 		elif msg["type"] == "FAIL":
 			res = {"type": "ACK"}
 			_send_msg(c, res)
-			# gossip(c, msg)
+			gossip(c, msg, live_osd)
 			
 		c.close()
 
@@ -66,13 +68,15 @@ def heartbeat_protocol(soc):
 	return
 
 
+def run_main_monitor_gossip_cum_recovery():
+	# Make sure to maintain this 
+	live_osd = {"osd_id1":True, "osd_id2":True, "osd_id3":True, "osd_id4":True}
 
-if __name__ == "__main__":
 	s = socket.socket()         
 	print ("Socket successfully created")
 	  
 	# reserve a port on your computer in our 
-	port = HEARTBEAT_PORT
+	port =  monitor_ip["primary"]["port"]       
 	  
 	# Next bind to the port 
 	# we have not typed any ip in the ip field 
@@ -83,14 +87,13 @@ if __name__ == "__main__":
 	print ("Monitor socket binded to %s" %(port)) 
 	  
 	# put the socket into listening mode 
-	s.listen(5)     
-	print ("socket is listening")            
+	s.listen(5)              
 	  
 	# a forever loop until we interrupt it or 
 	# an error occurs 
 	while True: 
 	  
-		heartbeat_protocol(s)
+		heartbeat_protocol(s, live_osd)
 		
 	s.close()
 	# Close the connection with the client 

@@ -3,20 +3,26 @@ import pickle
 import threading
 import time
 import os
+
+from storage_replication import replicate_pg
+
+sys.path.insert(1, '../utils/')
 from transfer import _send_msg, _recv_msg, _wait_recv_msg
-from info import MONITOR_IPs, OSD_IPs, HEARTBEAT_PORT, num_objects_per_file, max_num_objects_per_pg, MSG_SIZE, HEADERSIZE
-
-STORAGE_ID = 1
+from info import mds_ip, monitor_ip, storage_ip, num_objects_per_file, max_num_objects_per_pg, MSG_SIZE, HEADERSIZE
 
 
-def report_monitor(node_ip, node_id):
+
+STORAGE_ID = "osd_id1"
+
+
+def report_monitor(node_ip, osd_id):
 	flag = 0
 	#Will call monitor to state about the down node
 	soc = socket.socket()
 	soc.settimeout(5)
 	print ("Socket successfully created for Recovery: Primary")
 
-	monitor_1 = MONITOR_IPs["primary"]
+	monitor_1 = monitor_ip["primary"]
 	
 	try :
 		soc.connect((monitor_1["ip"], monitor_1["port"]))	
@@ -24,7 +30,7 @@ def report_monitor(node_ip, node_id):
 
 		print(f"Connecting Primary monitor...")
 		
-		res = {"type": "FAIL", "ip" : node_ip, "id" : node_id}
+		res = {"type": "FAIL", "ip" : node_ip, "osd_id" : osd_id}
 		_send_msg(soc, res)
 		
 		msg = _wait_recv_msg(soc, MSG_SIZE)
@@ -47,14 +53,14 @@ def report_monitor(node_ip, node_id):
 	print ("Socket successfully created for Recovery: Backup")
 	
 
-	monitor_2 = MONITOR_IPs["backup"]
+	monitor_2 = monitor_ip["backup"]
 
 	try : 
 		soc.connect((monitor_2["ip"], monitor_2["port"]))	
 		soc.settimeout(None)			
 		print(f"Connecting Backup monitor...")
 	
-		res = {"type": "FAIL", "ip" : node_ip, "id" : node_id}
+		res = {"type": "FAIL", "ip" : node_ip, "osd_id" : osd_id}
 		_send_msg(soc, res)
 
 		msg = _wait_recv_msg(soc, MSG_SIZE)
@@ -79,19 +85,20 @@ def recv_gossip():
 
 		i=0
 		for i in range(4):
-			if i+1 != STORAGE_ID:
-				node_ip =  OSD_IPs[i+1]["ip"]
-				port = OSD_IPs[i+1]["port"]
+			curr_osd = "osd_id" + str(i+1)
+			if curr_osd != STORAGE_ID:
+				node_ip =  storage_ip[curr_osd]["ip"]
+				port = storage_ip[curr_osd]["port"]
 
 				soc = socket.socket()
 				soc.settimeout(5)
-				print(f"\n\nSocket successfully created for Gossip with osd {i+1}")
+				print(f"\n\nSocket successfully created for Gossip with osd {curr_osd}")
 			
 				try :
 					soc.connect((node_ip, port))
 					soc.settimeout(None)
 
-					print(f"Connecting {node_ip} storage node number {i+1} port {port}")
+					print(f"Connecting {node_ip} storage node number {curr_osd} port {port}")
 					
 					msg = {"type": "ALIVE"}
 					_send_msg(soc, msg)
@@ -99,15 +106,15 @@ def recv_gossip():
 					rec = _wait_recv_msg(soc, MSG_SIZE)
 					print(msg)
 					if rec == None: 
-						print(f"Didn't receive data to Storage {i+1} ip {node_ip}! [Timeout] ")
-						report_monitor(node_ip, i+1)
+						print(f"Didn't receive data to Storage {curr_osd} ip {node_ip}! [Timeout] ")
+						report_monitor(node_ip, curr_osd)
 
 					elif rec["type"] != "ACK": 
-						report_monitor(node_ip, i+1)
+						report_monitor(node_ip, curr_osd)
 					
 				except :	
-					print(f"Didn't Connect to Storage {i+1} ip {node_ip}! [Timeout]")
-					report_monitor(node_ip, i+1)
+					print(f"Didn't Connect to Storage {curr_osd} ip {node_ip}! [Timeout]")
+					report_monitor(node_ip, curr_osd)
 			
 				soc.close()	
 
@@ -121,13 +128,12 @@ def send_heartbeat():
 
 	s = socket.socket()         
 	print ("Socket successfully created for Heartbeat")
-	port =  HEARTBEAT_PORT
+	port =  storage_ip[STORAGE_ID]["port"] 
 	s.bind(('', port))         
 	print ("Socket binded to %s" %(port)) 
 	  
 	# put the socket into listening mode 
 	s.listen(5)     
-	print ("Socket is listening") 
 
 	while True:
 		# Establish connection with client. 
@@ -154,9 +160,29 @@ def send_heartbeat():
 			os._exit(1)
 
 
-if __name__ == "__main__":
+def read_write_pg_replication():
+	#This will check for incoming messages 
+	#from other nodes to replicate certain data 
 
+	s = socket.socket()         
+	print ("Socket successfully created for Read-Write only for replication")
+	# As mentioned in the info file 
+	# Read/write request will be send on "port + 10"
+	port =  storage_ip[STORAGE_ID]["port"] + 10
+	s.bind(('', port))         
+	print ("Socket binded to %s" %(port)) 
+	  
+	# put the socket into listening mode 
+	s.listen(5)     
+	
+	while True:
+		replicate_pg(s)
+
+
+def _run_main_osd_gossip_cum_recovery():
 	p1 = threading.Thread(target=send_heartbeat)
 	p2 = threading.Thread(target=recv_gossip)
+	p3 = threading.Thread(target=read_write_pg_replication)
 	p1.start()
 	p2.start()
+	p3.start()
