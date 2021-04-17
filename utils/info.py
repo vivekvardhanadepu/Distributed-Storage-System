@@ -8,8 +8,8 @@
 """
 # MDS
 MDS_PORT = 1201
-MDS_IPs = {"primary":{"ip":"52.15.197.75", "port":MDS_PORT}, "backup":{"ip":"3.143.216.252", "port":MDS_PORT+1}}
-#MDS_IPs = {"primary":{"ip":"127.0.0.1", "port":MDS_PORT}, "backup":{"ip":"127.0.0.1", "port":MDS_PORT+1}}
+MDS_IPs = {"primary":{"ip":"3.142.94.239", "port":MDS_PORT}, "backup":{"ip":"100.26.230.145", "port":MDS_PORT+1}}
+# MDS_IPs = {"primary":{"ip":"127.0.0.1", "port":MDS_PORT}, "backup":{"ip":"127.0.0.1", "port":MDS_PORT+1}}
 
 
 num_objects_per_file = 1
@@ -44,15 +44,15 @@ OSD -> replicas ... for monitoring on OSD
 
 # OSD
 
-OSD_IPs = {1:"52.15.197.75", 2:"3.143.216.252", 3:"54.157.187.18", 4:"34.224.4.5"}
-#OSD_IPs = {1:"127.0.0.1", 2:"127.0.0.1", 3:"127.0.0.1", 4:"34.224.4.5"}
+OSD_IPs = {1:"3.142.94.239", 2:"3.14.3.192", 3:"100.26.230.145", 4:"54.165.64.0"}
+# OSD_IPs = {1:"127.0.0.1", 2:"127.0.0.1", 3:"127.0.0.1", 4:"34.224.4.5"}
 
 READ_WRITE_PORT = 1207
 HEARTBEAT_PORT = 1213
 
 
 # MONITOR
-MONITOR_IPs = {"primary": "34.224.4.5", "backup": "54.157.187.18"}
+MONITOR_IPs = {"primary": "3.14.3.192", "backup": "54.165.64.0"}
 #MONITOR_IPs = {"primary": "127.0.0.1", "backup": "127.0.0.1"}
 
 CLIENT_REQ_PORT = 1217
