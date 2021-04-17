@@ -3,16 +3,12 @@ import pickle
 import threading
 import time
 import os
-
-from storage_replication import replicate_pg
-
-sys.path.insert(1, '../utils/')
 from transfer import _send_msg, _recv_msg, _wait_recv_msg
 from info import mds_ip, monitor_ip, storage_ip, num_objects_per_file, max_num_objects_per_pg, MSG_SIZE, HEADERSIZE
 
+from storage_replication import replicate_pg
 
-
-STORAGE_ID = "osd_id1"
+STORAGE_ID = "osd_id2"
 
 
 def report_monitor(node_ip, osd_id):
@@ -179,7 +175,8 @@ def read_write_pg_replication():
 		replicate_pg(s)
 
 
-def _run_main_osd_gossip_cum_recovery():
+if __name__ == "__main__":
+
 	p1 = threading.Thread(target=send_heartbeat)
 	p2 = threading.Thread(target=recv_gossip)
 	p3 = threading.Thread(target=read_write_pg_replication)

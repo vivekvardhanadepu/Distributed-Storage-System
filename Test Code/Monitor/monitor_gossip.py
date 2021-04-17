@@ -1,13 +1,10 @@
 import socket
 import pickle
 import os
-import sys
-
-from monitor_replicate import recovery
-
-sys.path.insert(1, '../utils/')
 from transfer import _send_msg, _recv_msg, _wait_recv_msg
 from info import mds_ip, monitor_ip, storage_ip, num_objects_per_file, max_num_objects_per_pg, MSG_SIZE, HEADERSIZE
+
+from monitor_replicate import recovery
 
 
 def gossip(c, msg, live_osd):
@@ -68,7 +65,8 @@ def heartbeat_protocol(soc, live_osd):
 	return
 
 
-def run_main_monitor_gossip_cum_recovery():
+
+if __name__ == "__main__":
 	# Make sure to maintain this 
 	live_osd = {"osd_id1":True, "osd_id2":True, "osd_id3":True, "osd_id4":True}
 

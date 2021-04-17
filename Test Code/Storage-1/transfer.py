@@ -45,7 +45,7 @@ def _recv_msg(socket, size):
 	print("Waiting packet..")
 	while True:
 		try :
-			socket.settimeout(1)
+			socket.settimeout(0.5)
 			msg = socket.recv(MSG_SIZE)
 			# socket.settimeout(None)
 			print(".")
