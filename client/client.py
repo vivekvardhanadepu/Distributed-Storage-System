@@ -58,7 +58,7 @@ class Client:
 			ip = MDS_IPs["primary"]["ip"]
 			port = MDS_IPs["primary"]["port"]
 			# print(s.gethostname())      
-			s.bind(('', 9090))        
+			# s.bind(('', 9090))        
 			  
 			try:
 				s.connect((ip, port)) 
@@ -263,16 +263,18 @@ class Client:
 		_send_msg(s, data_msg)
 		print(len(pg.object_list))
 		
+		self.processing[pg.pg_id] = pg_data
+		threading.Thread(target=self.update_handler()).start()
 		### Add server to receive response 
 		osd_response = _wait_recv_msg(s, 1024)
 		
 		if osd_response["status"] == "RECEIVED":
 			print("file sent to OSD")
-			self.processing[pg.pg_id] = pg_data
+			# self.processing[pg.pg_id] = pg_data
 			# if self.start_update_handler == False:
 			# 	self.start_update_handler = True
 				# self.update_handler()
-			threading.Thread(target=self.update_handler())
+			# threading.Thread(target=self.update_handler())
 			s.close()
 			return 0
 		
@@ -445,7 +447,7 @@ class Client:
 		msg = {"type":"CLIENT_LOGOUT", "username":self.username}
 
 		s = socket.socket()         
-		s.bind(('', 9090))
+		# s.bind(('', 9090))
 		ip = MDS_IPs["primary"]["ip"]
 		port = MDS_IPs["primary"]["port"]                
 		  
@@ -549,7 +551,7 @@ def login():
 	ip = MDS_IPs["primary"]["ip"]
 	port = MDS_IPs["primary"]["port"]
 	# print(s.gethostname())      
-	s.bind(('', 9090))        
+	# s.bind(('', 9090))        
 	  
 	try:
 		s.connect((ip, port)) 
