@@ -14,11 +14,11 @@ import sys
 
 sys.path.insert(1, '../utils/')
 from transfer import _send_msg, _recv_msg, _wait_recv_msg
-from monitor_gossip import heartbeat_protocol
+# from monitor_gossip import heartbeat_protocol
 from info import MDS_IPs, MDS_PORT, WRITE_ACK_PORT, OSD_INACTIVE_STATUS_PORT, CLIENT_REQ_PORT, \
                     RECV_PRIMARY_UPDATE_PORT, MSG_SIZE
 
-hashtable = {}
+# hashtable = {}
 MDS_flags = {}
 cluster_topology = {}
 MDS_IP = MDS_IPs["primary"]["ip"]
@@ -77,6 +77,7 @@ def recv_primary_update():
         # recv the update
         update = _recv_msg(c, 1024)
         print(update)
+        # hashtable = _read
 
         if update["update_type"] == "hash_table":
             for i in range(len(update["pg_or_osd_ids_list"])):
@@ -440,5 +441,11 @@ def main(argc, argv):
     else:
         recv_primary_update()
 
+def _read_hash():
+    hashtable_file = open('hashtable', 'rb')
+    hashtable_dump = hashtable_file.read()
+    hashtable = pickle.loads(hashtable_dump)
+
+    return hashtable
 if __name__ == '__main__':
     main(len(sys.argv), sys.argv)
